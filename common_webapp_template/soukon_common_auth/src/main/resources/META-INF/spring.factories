@@ -1,0 +1,3 @@
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+  com.soukon.auth.service.impl.UserServiceImpl,\
+  com.soukon.auth.mapper.UserMapper

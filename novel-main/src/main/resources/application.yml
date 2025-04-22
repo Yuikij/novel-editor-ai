@@ -1,0 +1,39 @@
+server:
+  port: 18080
+
+spring:
+  application:
+    name: novel-editor-ai
+  config:
+    import: nacos:application-value.yml
+  profiles:
+    active: value,formal,private
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 172.23.104.184
+      config:
+        server-addr: 172.23.104.184
+        file-extension: yml
+        username: nacos
+        password: nacos
+        namespace: e1d94f75-2525-4688-9e00-bba671f3be4c
+  ai:
+    dashscope:
+        api-key: 111
+    openai:
+      # API????
+      api-key: ${AI_OPENAI_API_KEY}
+      # ?????API?? https://ark.cn-beijing.volces.com/api/v3/chat/completions
+      base-url: https://ark.cn-beijing.volces.com/api/
+      chat:
+        options:
+          # ??ID,???????????ID
+          model: doubao-1-5-lite-32k-250115
+        # Chat????,?OpenAI??????
+        completions-path: /v3/chat/completions
+logging:
+  level:
+    com.soukon.mapper: debug
