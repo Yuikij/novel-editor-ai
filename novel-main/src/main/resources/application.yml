@@ -4,6 +4,10 @@ server:
 spring:
   application:
     name: novel-editor-ai
+  mvc:
+    pathmatch:
+      use-trailing-slash-match: true
+      matching-strategy: ant_path_matcher
   config:
     import: nacos:application-value.yml
   profiles:
