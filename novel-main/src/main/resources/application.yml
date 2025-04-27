@@ -19,7 +19,7 @@ spring:
         file-extension: yml
         username: nacos
         password: nacos
-        namespace: e1d94f75-2525-4688-9e00-bba671f3be4c
+        namespace: 12705118-223c-456b-817f-3838f5735680
   ai:
     dashscope:
         api-key: 111
