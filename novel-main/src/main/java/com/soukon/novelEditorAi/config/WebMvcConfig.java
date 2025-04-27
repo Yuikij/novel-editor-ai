@@ -7,7 +7,7 @@ import org.springframework.web.util.pattern.PathPatternParser;
 
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {
-    
+
     @Override
     public void configurePathMatch(PathMatchConfigurer configurer) {
         PathPatternParser pathPatternParser = new PathPatternParser();
