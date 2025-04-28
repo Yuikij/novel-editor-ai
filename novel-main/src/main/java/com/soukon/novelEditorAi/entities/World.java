@@ -11,6 +11,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.List;
+import com.soukon.novelEditorAi.entities.Element;
 
 @Data
 @TableName(value = "worlds", autoResultMap = true)
@@ -23,7 +24,7 @@ public class World {
     private String description;
     
     @TableField(typeHandler = JacksonTypeHandler.class)
-    private List<Map<String, Object>> elements;
+    private List<Element> elements;
     
     private String notes;
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
