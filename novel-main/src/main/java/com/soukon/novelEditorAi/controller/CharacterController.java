@@ -25,7 +25,7 @@ public class CharacterController {
     }
     
     @GetMapping("/project/{projectId}")
-    public Result<List<Character>> listByProjectId(@PathVariable("projectId") Integer projectId) {
+    public Result<List<Character>> listByProjectId(@PathVariable("projectId") Long projectId) {
         LambdaQueryWrapper<Character> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(Character::getProjectId, projectId);
         queryWrapper.orderByAsc(Character::getName);

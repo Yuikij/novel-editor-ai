@@ -28,7 +28,7 @@ public class PlotController {
     public Result<List<Plot>> listByProjectId(@PathVariable("projectId") Integer projectId) {
         LambdaQueryWrapper<Plot> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(Plot::getProjectId, projectId);
-        queryWrapper.orderByAsc(Plot::getPlotOrder);
+        queryWrapper.orderByAsc(Plot::getSortOrder);
         List<Plot> plots = plotService.list(queryWrapper);
         return Result.success(plots);
     }
@@ -37,7 +37,7 @@ public class PlotController {
     public Result<List<Plot>> listByChapterId(@PathVariable("chapterId") Integer chapterId) {
         LambdaQueryWrapper<Plot> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(Plot::getChapterId, chapterId);
-        queryWrapper.orderByAsc(Plot::getPlotOrder);
+        queryWrapper.orderByAsc(Plot::getSortOrder);
         List<Plot> plots = plotService.list(queryWrapper);
         return Result.success(plots);
     }
@@ -63,7 +63,7 @@ public class PlotController {
             queryWrapper.eq(Plot::getType, type);
         }
         
-        queryWrapper.orderByAsc(Plot::getPlotOrder);
+        queryWrapper.orderByAsc(Plot::getSortOrder);
         plotService.page(pageInfo, queryWrapper);
         
         return Result.success(pageInfo);
@@ -85,20 +85,20 @@ public class PlotController {
         plot.setUpdatedAt(now);
         
         // If plotOrder is not set, find the max order and set to order+1
-        if (plot.getPlotOrder() == null) {
+        if (plot.getSortOrder() == null) {
             LambdaQueryWrapper<Plot> queryWrapper = new LambdaQueryWrapper<>();
             queryWrapper.eq(Plot::getProjectId, plot.getProjectId());
             if (plot.getChapterId() != null) {
                 queryWrapper.eq(Plot::getChapterId, plot.getChapterId());
             }
-            queryWrapper.orderByDesc(Plot::getPlotOrder);
+            queryWrapper.orderByDesc(Plot::getSortOrder);
             queryWrapper.last("LIMIT 1");
             
             Plot lastPlot = plotService.getOne(queryWrapper);
             if (lastPlot != null) {
-                plot.setPlotOrder(lastPlot.getPlotOrder() + 1);
+                plot.setSortOrder(lastPlot.getSortOrder() + 1);
             } else {
-                plot.setPlotOrder(1);
+                plot.setSortOrder(1);
             }
         }
         

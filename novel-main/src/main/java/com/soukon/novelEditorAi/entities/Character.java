@@ -18,20 +18,25 @@ public class Character {
     @TableId(value = "id", type = IdType.ASSIGN_ID)
     private Long id;
     
-    private Integer projectId;
+    private Long projectId;
     private String name;
-    private String role;
-    
+//    描述
+    private String description;
+    private String role; // protagonist, antagonist, supporting
+//    性别
+    private String gender;
+//    年龄
+    private Integer age;
+//    性格特征
     @TableField(typeHandler = JacksonTypeHandler.class)
     private List<String> personality;
     
-    private String background;
-    
     @TableField(typeHandler = JacksonTypeHandler.class)
     private List<String> goals;
-    
-    private String avatarUrl;
+
+    private String background;
     private String notes;
+    
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdAt;
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")

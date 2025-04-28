@@ -40,4 +40,4 @@ spring:
         completions-path: /v3/chat/completions
 logging:
   level:
-    com.soukon.mapper: debug
+    com.soukon.novelEditorAi.mapper: debug
