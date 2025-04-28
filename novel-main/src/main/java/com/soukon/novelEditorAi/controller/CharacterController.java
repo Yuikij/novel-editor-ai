@@ -89,8 +89,6 @@ public class CharacterController {
         if (character.getRelationships() != null) {
             for (CharacterRelationship rel : character.getRelationships()) {
                 rel.setSourceCharacterId(character.getId());
-                rel.setTargetCharacterId(rel.getCharacterId());
-                rel.setRelationshipType(rel.getType());
                 rel.setProjectId(character.getProjectId());
                 rel.setCreatedAt(now);
                 rel.setUpdatedAt(now);
@@ -111,7 +109,23 @@ public class CharacterController {
         character.setCreatedAt(existingCharacter.getCreatedAt());
         character.setUpdatedAt(LocalDateTime.now());
         characterService.updateById(character);
-        
+        // 删除原有关系
+        LambdaQueryWrapper<CharacterRelationship> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(CharacterRelationship::getSourceCharacterId, id);
+        characterRelationshipService.remove(queryWrapper);
+
+        // 保存新的关系
+        if (character.getRelationships() != null) {
+            LocalDateTime now = LocalDateTime.now();
+            for (CharacterRelationship rel : character.getRelationships()) {
+                rel.setSourceCharacterId(id);
+                rel.setProjectId(character.getProjectId());
+                rel.setCreatedAt(now);
+                rel.setUpdatedAt(now);
+                characterRelationshipService.save(rel);
+            }
+        }
+
         return Result.success("Character updated successfully", character);
     }
 
