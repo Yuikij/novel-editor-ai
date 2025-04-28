@@ -1,6 +1,7 @@
 package com.soukon.novelEditorAi.entities;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -15,9 +16,14 @@ public class CharacterRelationship {
     @TableId(value = "id", type = IdType.ASSIGN_ID)
     private Long id;
     
-    private Integer projectId;
-    private Integer sourceCharacterId;
-    private Integer targetCharacterId;
+    private Long projectId;
+    private Long sourceCharacterId;
+    private Long targetCharacterId;
+    //前端传入的目标角色ID
+    @TableField(exist = false)
+    private Long characterId;
+    @TableField(exist = false)
+    private String type;
     private String relationshipType;
     private String description;
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")

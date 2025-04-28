@@ -41,4 +41,7 @@ public class Character {
     private LocalDateTime createdAt;
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updatedAt;
+
+    @TableField(exist = false)
+    private List<com.soukon.novelEditorAi.entities.CharacterRelationship> relationships;
 } 

@@ -25,7 +25,7 @@ public class PlotController {
     }
     
     @GetMapping("/project/{projectId}")
-    public Result<List<Plot>> listByProjectId(@PathVariable("projectId") Integer projectId) {
+    public Result<List<Plot>> listByProjectId(@PathVariable("projectId") Long projectId) {
         LambdaQueryWrapper<Plot> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(Plot::getProjectId, projectId);
         queryWrapper.orderByAsc(Plot::getSortOrder);
@@ -34,7 +34,7 @@ public class PlotController {
     }
     
     @GetMapping("/chapter/{chapterId}")
-    public Result<List<Plot>> listByChapterId(@PathVariable("chapterId") Integer chapterId) {
+    public Result<List<Plot>> listByChapterId(@PathVariable("chapterId") Long chapterId) {
         LambdaQueryWrapper<Plot> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(Plot::getChapterId, chapterId);
         queryWrapper.orderByAsc(Plot::getSortOrder);
@@ -46,8 +46,8 @@ public class PlotController {
     public Result<Page<Plot>> page(
             @RequestParam(value = "page", defaultValue = "1", name = "page") Integer page,
             @RequestParam(value = "pageSize", defaultValue = "10", name = "pageSize") Integer pageSize,
-            @RequestParam(value = "projectId", required = false, name = "projectId") Integer projectId,
-            @RequestParam(value = "chapterId", required = false, name = "chapterId") Integer chapterId,
+            @RequestParam(value = "projectId", required = false, name = "projectId") Long projectId,
+            @RequestParam(value = "chapterId", required = false, name = "chapterId") Long chapterId,
             @RequestParam(value = "type", required = false, name = "type") String type) {
         
         Page<Plot> pageInfo = new Page<>(page, pageSize);
@@ -70,7 +70,7 @@ public class PlotController {
     }
 
     @GetMapping("/{id}")
-    public Result<Plot> getById(@PathVariable("id") Integer id) {
+    public Result<Plot> getById(@PathVariable("id") Long id) {
         Plot plot = plotService.getById(id);
         if (plot != null) {
             return Result.success(plot);
@@ -122,7 +122,7 @@ public class PlotController {
     }
 
     @DeleteMapping("/{id}")
-    public Result<Void> delete(@PathVariable("id") Integer id) {
+    public Result<Void> delete(@PathVariable("id") Long id) {
         Plot plot = plotService.getById(id);
         if (plot == null) {
             return Result.error("Plot not found with id: " + id);
