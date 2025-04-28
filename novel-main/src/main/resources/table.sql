@@ -37,20 +37,21 @@ CREATE TABLE worlds (
 
 
 -- 创建章节表
-CREATE TABLE chapters (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '章节ID，主键，自增',
-    project_id BIGINT NOT NULL COMMENT '项目ID，外键，关联projects表',
-    title VARCHAR(255) NOT NULL COMMENT '章节标题，非空',
-    `sort_order` INT NOT NULL COMMENT '章节顺序，非空，整数类型',
-    status ENUM('draft', 'in-progress', 'completed', 'edited') DEFAULT 'draft' COMMENT '章节状态，默认草稿',
-    summary VARCHAR(255) COMMENT '章节摘要，可为空',
-    notes TEXT COMMENT '章节备注，可为空',
-    word_count_goal BIGINT COMMENT '目标字数，可为空，章节计划字数',
-    word_count BIGINT DEFAULT 0 COMMENT '统计字数，默认0，记录实际字数',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间，默认当前时间',
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间，自动更新为当前时间'
-) COMMENT='存储章节信息，包括标题、顺序、状态、摘要和字数信息';
-
+CREATE TABLE `chapters` (
+                            `id` bigint NOT NULL AUTO_INCREMENT COMMENT '章节ID，主键，自增',
+                            `project_id` bigint NOT NULL COMMENT '项目ID，外键，关联projects表',
+                            `title` varchar(255) COLLATE utf8mb4_general_ci NOT NULL COMMENT '章节标题，非空',
+                            `sort_order` int NOT NULL COMMENT '章节顺序，非空，整数类型',
+                            `status` enum('draft','in-progress','completed','edited') COLLATE utf8mb4_general_ci DEFAULT 'draft' COMMENT '章节状态，默认草稿',
+                            `summary` varchar(255) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '章节摘要，可为空',
+                            `notes` text COLLATE utf8mb4_general_ci COMMENT '章节备注，可为空',
+                            `word_count_goal` bigint DEFAULT NULL COMMENT '目标字数，可为空，章节计划字数',
+                            `word_count` bigint DEFAULT '0' COMMENT '统计字数，默认0，记录实际字数',
+                            `content` text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci COMMENT '章节内容',
+                            `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间，默认当前时间',
+                            `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间，自动更新为当前时间',
+                            PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=1916694585131737091 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='存储章节信息，包括标题、顺序、状态、摘要和字数信息';
 
 
 
