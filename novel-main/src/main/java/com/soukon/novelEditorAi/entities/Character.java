@@ -10,6 +10,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Data
 @TableName(value = "characters", autoResultMap = true)
@@ -44,4 +45,28 @@ public class Character {
 
     @TableField(exist = false)
     private List<com.soukon.novelEditorAi.entities.CharacterRelationship> relationships;
+    
+    /**
+     * 生成用于构建生成请求 Prompt 的单个角色信息。
+     *
+     * @return 包含角色姓名和描述的字符串。
+     */
+    public String toPrompt() {
+        StringBuilder sb = new StringBuilder();
+        if (name != null && !name.isEmpty()) {
+            sb.append("- ").append(name);
+            if (description != null && !description.isEmpty()) {
+                sb.append(": ").append(description);
+            }
+            // 可以根据需要添加更多信息，如 role, gender, age, personality, goals, background 等
+            // 例如：
+            // if (role != null) sb.append(" (角色: ").append(role).append(")");
+            // if (age != null) sb.append(" (年龄: ").append(age).append(")");
+            // if (personality != null && !personality.isEmpty()) {
+            //     sb.append(" (性格: ").append(String.join(", ", personality)).append(")");
+            // }
+            sb.append("\n");
+        }
+        return sb.toString();
+    }
 } 

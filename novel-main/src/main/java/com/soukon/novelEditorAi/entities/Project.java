@@ -10,6 +10,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Data
 @TableName(value = "projects", autoResultMap = true)
@@ -41,4 +42,24 @@ public class Project {
     private LocalDateTime createdAt;
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updatedAt;
+    
+    /**
+     * 生成用于构建生成请求 Prompt 的项目信息部分。
+     *
+     * @return 包含小说标题、概要和风格的字符串。
+     */
+    public String toPrompt() {
+        StringBuilder sb = new StringBuilder();
+        if (title != null && !title.isEmpty()) {
+            sb.append("小说标题: ").append(title).append("\n");
+        }
+        if (synopsis != null && !synopsis.isEmpty()) {
+            sb.append("小说概要: ").append(synopsis).append("\n");
+        }
+        if (style != null && !style.isEmpty()) {
+            sb.append("小说风格: ").append(style).append("\n");
+        }
+        // 可以根据需要添加更多字段，例如 genre, targetAudience 等
+        return sb.toString();
+    }
 } 

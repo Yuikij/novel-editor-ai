@@ -168,7 +168,7 @@ public class ChapterController {
             ChapterContentResponse response = chapterContentService.generateChapterContent(request);
             
             // 保存生成的内容（可选）
-            // chapterContentService.saveChapterContent(chapterId, response.getContent());
+             chapterContentService.saveChapterContent(chapterId, response.getContent());
             
             return Result.success(response);
         } catch (Exception e) {

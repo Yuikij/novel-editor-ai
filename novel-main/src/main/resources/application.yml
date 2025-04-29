@@ -25,11 +25,7 @@ spring:
         password: nacos
         namespace: 12705118-223c-456b-817f-3838f5735680
   ai:
-    dashscope:
-        api-key: 111
     openai:
-      # API????
-      api-key: ${AI_OPENAI_API_KEY}
       # ?????API?? https://ark.cn-beijing.volces.com/api/v3/chat/completions
       base-url: https://ark.cn-beijing.volces.com/api/
       chat:

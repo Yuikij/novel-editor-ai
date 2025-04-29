@@ -123,9 +123,9 @@ public class ChapterContentServiceImpl implements ChapterContentService {
         request.setChapterContext(context);
         
         // 设置默认参数
-        if (request.getMaxTokens() == null) {
-            request.setMaxTokens(defaultMaxTokens);
-        }
+//        if (request.getMaxTokens() == null) {
+//            request.setMaxTokens(defaultMaxTokens);
+//        }
         if (request.getTemperature() == null) {
             request.setTemperature(defaultTemperature);
         }
@@ -271,117 +271,81 @@ public class ChapterContentServiceImpl implements ChapterContentService {
     }
     
     /**
-     * 构建生成提示词
+     * 构建生成请求的提示词
      */
     private List<Message> buildPrompt(ChapterContentRequest request) {
-        List<Message> messages = new ArrayList<>();
-        
-        // 系统提示词
-        messages.add(new SystemMessage(CHAPTER_CONTENT_PROMPT));
-        
-        // 构建上下文提示词
-        Map<String, Object> contextMap = new HashMap<>();
         ChapterContext context = request.getChapterContext();
-        // 保证所有 value 都是 String，null 变成 ""
-        contextMap.put("novelTitle", context.getNovelTitle() != null ? context.getNovelTitle() : "");
-        contextMap.put("novelSummary", context.getNovelSummary() != null ? context.getNovelSummary() : "");
-        contextMap.put("novelStyle", context.getNovelStyle() != null ? context.getNovelStyle() : "");
-        contextMap.put("chapterTitle", request.getChapterTitle() != null ? request.getChapterTitle() : (context.getCurrentChapter() != null && context.getCurrentChapter().getTitle() != null ? context.getCurrentChapter().getTitle() : ""));
-        contextMap.put("chapterSummary", context.getChapterSummary() != null ? context.getChapterSummary() : "");
-        contextMap.put("previousChapterSummary", context.getPreviousChapterSummary() != null ? context.getPreviousChapterSummary() : "");
-        contextMap.put("chapterBackground", context.getChapterBackground() != null ? context.getChapterBackground() : "");
-        contextMap.put("worldName", context.getWorld() != null && context.getWorld().getName() != null ? context.getWorld().getName() : "");
-        contextMap.put("worldDescription", context.getWorld() != null && context.getWorld().getDescription() != null ? context.getWorld().getDescription() : "");
+        if (context == null) {
+            throw new IllegalStateException("章节上下文未构建");
+        }
+
+        StringBuilder userPromptBuilder = new StringBuilder();
+        userPromptBuilder.append("请根据以下上下文信息，创作符合要求的章节内容：\n\n");
+
+        // 项目信息
+        if (context.getProject() != null) {
+            userPromptBuilder.append(context.getProject().toPrompt());
+            userPromptBuilder.append("\n"); // 添加空行分隔
+        }
+
+        // 章节信息
+        String previousChapterSummary = context.getPreviousChapter() != null ? context.getPreviousChapter().getSummary() : null;
+        if (context.getCurrentChapter() != null) {
+            userPromptBuilder.append(context.getCurrentChapter().toPrompt(previousChapterSummary));
+            userPromptBuilder.append("\n"); // 添加空行分隔
+        }
+
+        // 世界观信息
+        if (context.getWorld() != null) {
+            userPromptBuilder.append(context.getWorld().toPrompt());
+            userPromptBuilder.append("\n"); // 添加空行分隔
+        }
+
+        // 角色信息
         if (context.getCharacters() != null && !context.getCharacters().isEmpty()) {
-            StringBuilder charactersInfo = new StringBuilder();
-            context.getCharacters().forEach(character -> {
-                charactersInfo.append("- ").append(character.getName() != null ? character.getName() : "")
-                        .append(": ").append(character.getDescription() != null ? character.getDescription() : "")
-                        .append("\n");
-            });
-            contextMap.put("characters", charactersInfo.toString());
-        } else {
-            contextMap.put("characters", "");
+            userPromptBuilder.append("主要角色:\n");
+            context.getCharacters().forEach(character -> userPromptBuilder.append(character.toPrompt()));
+            userPromptBuilder.append("\n"); // 添加空行分隔
         }
+
+        // 本章情节
         if (context.getChapterPlots() != null && !context.getChapterPlots().isEmpty()) {
-            StringBuilder plotsInfo = new StringBuilder();
-            context.getChapterPlots().forEach(plot -> {
-                plotsInfo.append("- ").append(plot.getDescription() != null ? plot.getDescription() : "")
-                        .append("\n");
-            });
-            contextMap.put("plots", plotsInfo.toString());
-        } else {
-            contextMap.put("plots", "");
+            userPromptBuilder.append("本章节需要包含的情节:\n");
+            context.getChapterPlots().forEach(plot -> userPromptBuilder.append(plot.toPrompt()));
+            userPromptBuilder.append("\n"); // 添加空行分隔
         }
-        // 如果启用了RAG，添加相关文档
-        if (ragEnabled) {
-            String relevantInfo = retrieveRelevantInfo(request.getChapterId());
-            contextMap.put("relevantInfo", relevantInfo != null ? relevantInfo : "");
-        } else {
-            contextMap.put("relevantInfo", "");
+
+        // 相关背景信息 (RAG)
+        String relevantInfo = retrieveRelevantInfo(request.getChapterId());
+        if (relevantInfo != null && !relevantInfo.isEmpty()) {
+            userPromptBuilder.append("相关背景信息:\n").append(relevantInfo).append("\n\n");
         }
-        // 添加已有内容（如果有）
-        if (request.getExistingContent() != null && !request.getExistingContent().isEmpty()) {
-            contextMap.put("existingContent", request.getExistingContent());
+
+        // 现有内容（续写）
+        String existingContent = context.getCurrentChapter() != null ? context.getCurrentChapter().getContent() : null;
+        if (existingContent != null && !existingContent.trim().isEmpty()) {
+            userPromptBuilder.append("已有内容（需要续写）:\n").append(existingContent).append("\n\n");
+            userPromptBuilder.append("请根据上述信息，续写本章节内容。");
         } else {
-            contextMap.put("existingContent", "");
+            userPromptBuilder.append("请根据上述信息，创作本章节内容。");
         }
+
+        String finalUserPrompt = userPromptBuilder.toString();
+        log.info("[章节内容生成] 最终用户提示词:\n{}", finalUserPrompt);
+
+        List<Message> messages = new ArrayList<>();
+        // 添加系统提示词
+        messages.add(new SystemMessage(CHAPTER_CONTENT_PROMPT));
+        // 添加用户提示词
+        messages.add(new UserMessage(finalUserPrompt));
         
-        String contextPrompt = """
-                请根据以下上下文信息，创作符合要求的章节内容：
-                
-                小说标题: <novelTitle>
-                小说概要: <novelSummary>
-                小说风格: <novelStyle>
-                章节标题: <chapterTitle>
-                章节摘要: <chapterSummary>
-                <if(previousChapterSummary)>上一章节摘要: <previousChapterSummary></if>
-                <if(chapterBackground)>章节背景: <chapterBackground></if>
-                
-                <if(worldName)>
-                世界观:
-                <worldName>: <worldDescription>
-                </if>
-                
-                <if(characters)>
-                主要角色:
-                <characters>
-                </if>
-                
-                <if(plots)>
-                本章节需要包含的情节:
-                <plots>
-                </if>
-                
-                <if(relevantInfo)>
-                相关背景信息:
-                <relevantInfo>
-                </if>
-                
-                <if(existingContent)>
-                已有内容（需要续写）:
-                <existingContent>
-                </if>
-                
-                请根据上述信息，<if(existingContent)>续写<else>创作</if>本章节内容。
-                """;
-                
-        // 生成上下文提示词
-        SystemPromptTemplate promptTemplate = new SystemPromptTemplate(contextPrompt);
-        Message contextMessage = promptTemplate.createMessage(contextMap);
-        String formattedPrompt = contextMessage.getText();
-        
-        // 打印上下文参数和最终提示词，便于排查
-        log.info("[章节内容生成] contextMap: {}", contextMap);
-        log.info("[章节内容生成] 最终提示词:\n{}", formattedPrompt);
-        
-        messages.add(new UserMessage(formattedPrompt));
-        
-        // 添加自定义提示词（如果有）
+        // 如果有自定义风格提示，可以作为SystemMessage或UserMessage添加
         if (request.getPrompt() != null && !request.getPrompt().isEmpty()) {
-            messages.add(new UserMessage(request.getPrompt()));
+            // 示例：作为补充的用户消息
+             messages.add(new UserMessage("补充写作要求：" + request.getPrompt()));
+            // 或者修改系统提示词，但这更复杂
         }
-        
+
         return messages;
     }
     
