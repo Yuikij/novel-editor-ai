@@ -40,6 +40,7 @@ public class NamingServiceImpl implements NamingService {
             4. 每次提供3-5个名称选项，并附带简短解释
             5. 名称应当匹配用户描述的风格、类型和主题
             
+            必须严格遵守JSON格式，如果有疑问可以在notes字段里说明。
             返回格式必须是结构化的JSON格式，如下：
             {
                 "names": [
@@ -51,7 +52,8 @@ public class NamingServiceImpl implements NamingService {
                         "name": "名称2",
                         "explanation": "对这个名称的解释"
                     }
-                ]
+                ],
+                "notes": "其他说明或建议"
             }
             """;
     

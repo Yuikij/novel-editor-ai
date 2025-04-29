@@ -28,19 +28,28 @@ public class NamingController {
      * 小说名称生成接口
      * @param genre 小说类型
      * @param style 写作风格
-     * @param theme 主题/关键词
+     * @param tags 标签
+     * @param synopsis 简介
+     * @param targetAudience 目标受众
+     * @param writingRequirements 写作要求
      * @return 生成的名称列表
      */
     @GetMapping("/novel")
     public Result<NamingResponse> generateNovelName(
             @RequestParam(value = "genre", required = false) String genre,
             @RequestParam(value = "style", required = false) String style,
-            @RequestParam(value = "theme", required = false) String theme) {
+            @RequestParam(value = "tags", required = false) String[] tags,
+            @RequestParam(value = "synopsis", required = false) String synopsis,
+            @RequestParam(value = "targetAudience", required = false) String targetAudience,
+            @RequestParam(value = "writingRequirements", required = false) String[] writingRequirements) {
 
         Map<String, Object> parameters = new HashMap<>();
         parameters.put("类型", genre != null ? genre : "未指定");
         parameters.put("风格", style != null ? style : "未指定");
-        parameters.put("主题", theme != null ? theme : "未指定");
+        parameters.put("标签", tags != null ? tags : new String[]{"未指定"});
+        parameters.put("简介", synopsis != null ? synopsis : "未指定");
+        parameters.put("目标受众", targetAudience != null ? targetAudience : "未指定");
+        parameters.put("写作要求", writingRequirements != null ? writingRequirements : new String[]{"未指定"});
         parameters.put("需求", "小说名称");
 
         NamingResponse response = namingService.generateNames(parameters);

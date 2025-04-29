@@ -15,4 +15,5 @@ import java.util.List;
 @AllArgsConstructor
 public class NamingResponse {
     private List<NameSuggestion> names;
+    private String notes;
 } 
