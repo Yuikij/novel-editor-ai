@@ -135,6 +135,7 @@ public class ChapterContentServiceImpl implements ChapterContentService {
         
         // 调用AI模型生成内容
         String generatedContent = chatClient.prompt(new Prompt(messages)).call().content();
+        log.info("[章节内容生成] AI返回内容: {}", generatedContent);
         
         // 计算生成耗时
         long endTime = System.currentTimeMillis();
@@ -281,96 +282,99 @@ public class ChapterContentServiceImpl implements ChapterContentService {
         // 构建上下文提示词
         Map<String, Object> contextMap = new HashMap<>();
         ChapterContext context = request.getChapterContext();
-        
-        contextMap.put("novelTitle", context.getNovelTitle());
-        contextMap.put("novelSummary", context.getNovelSummary());
-        contextMap.put("novelStyle", context.getNovelStyle());
-        contextMap.put("chapterTitle", request.getChapterTitle() != null ? 
-                request.getChapterTitle() : context.getCurrentChapter().getTitle());
-        contextMap.put("chapterSummary", context.getChapterSummary());
-        contextMap.put("previousChapterSummary", context.getPreviousChapterSummary());
-        contextMap.put("chapterBackground", context.getChapterBackground());
-        
-        if (context.getWorld() != null) {
-            contextMap.put("worldName", context.getWorld().getName());
-            contextMap.put("worldDescription", context.getWorld().getDescription());
-        }
-        
+        // 保证所有 value 都是 String，null 变成 ""
+        contextMap.put("novelTitle", context.getNovelTitle() != null ? context.getNovelTitle() : "");
+        contextMap.put("novelSummary", context.getNovelSummary() != null ? context.getNovelSummary() : "");
+        contextMap.put("novelStyle", context.getNovelStyle() != null ? context.getNovelStyle() : "");
+        contextMap.put("chapterTitle", request.getChapterTitle() != null ? request.getChapterTitle() : (context.getCurrentChapter() != null && context.getCurrentChapter().getTitle() != null ? context.getCurrentChapter().getTitle() : ""));
+        contextMap.put("chapterSummary", context.getChapterSummary() != null ? context.getChapterSummary() : "");
+        contextMap.put("previousChapterSummary", context.getPreviousChapterSummary() != null ? context.getPreviousChapterSummary() : "");
+        contextMap.put("chapterBackground", context.getChapterBackground() != null ? context.getChapterBackground() : "");
+        contextMap.put("worldName", context.getWorld() != null && context.getWorld().getName() != null ? context.getWorld().getName() : "");
+        contextMap.put("worldDescription", context.getWorld() != null && context.getWorld().getDescription() != null ? context.getWorld().getDescription() : "");
         if (context.getCharacters() != null && !context.getCharacters().isEmpty()) {
             StringBuilder charactersInfo = new StringBuilder();
             context.getCharacters().forEach(character -> {
-                charactersInfo.append("- ").append(character.getName())
-                        .append(": ").append(character.getDescription())
+                charactersInfo.append("- ").append(character.getName() != null ? character.getName() : "")
+                        .append(": ").append(character.getDescription() != null ? character.getDescription() : "")
                         .append("\n");
             });
             contextMap.put("characters", charactersInfo.toString());
+        } else {
+            contextMap.put("characters", "");
         }
-        
         if (context.getChapterPlots() != null && !context.getChapterPlots().isEmpty()) {
             StringBuilder plotsInfo = new StringBuilder();
             context.getChapterPlots().forEach(plot -> {
-                plotsInfo.append("- ").append(plot.getDescription())
+                plotsInfo.append("- ").append(plot.getDescription() != null ? plot.getDescription() : "")
                         .append("\n");
             });
             contextMap.put("plots", plotsInfo.toString());
+        } else {
+            contextMap.put("plots", "");
         }
-        
         // 如果启用了RAG，添加相关文档
         if (ragEnabled) {
             String relevantInfo = retrieveRelevantInfo(request.getChapterId());
-            if (relevantInfo != null && !relevantInfo.isEmpty()) {
-                contextMap.put("relevantInfo", relevantInfo);
-            }
+            contextMap.put("relevantInfo", relevantInfo != null ? relevantInfo : "");
+        } else {
+            contextMap.put("relevantInfo", "");
+        }
+        // 添加已有内容（如果有）
+        if (request.getExistingContent() != null && !request.getExistingContent().isEmpty()) {
+            contextMap.put("existingContent", request.getExistingContent());
+        } else {
+            contextMap.put("existingContent", "");
         }
         
         String contextPrompt = """
                 请根据以下上下文信息，创作符合要求的章节内容：
                 
-                小说标题: {{novelTitle}}
-                小说概要: {{novelSummary}}
-                小说风格: {{novelStyle}}
-                章节标题: {{chapterTitle}}
-                章节摘要: {{chapterSummary}}
-                {%if previousChapterSummary != null %}上一章节摘要: {{previousChapterSummary}}{%endif%}
-                {%if chapterBackground != null %}章节背景: {{chapterBackground}}{%endif%}
+                小说标题: <novelTitle>
+                小说概要: <novelSummary>
+                小说风格: <novelStyle>
+                章节标题: <chapterTitle>
+                章节摘要: <chapterSummary>
+                <if(previousChapterSummary)>上一章节摘要: <previousChapterSummary></if>
+                <if(chapterBackground)>章节背景: <chapterBackground></if>
                 
-                {%if worldName != null %}
+                <if(worldName)>
                 世界观:
-                {{worldName}}: {{worldDescription}}
-                {%endif%}
+                <worldName>: <worldDescription>
+                </if>
                 
-                {%if characters != null %}
+                <if(characters)>
                 主要角色:
-                {{characters}}
-                {%endif%}
+                <characters>
+                </if>
                 
-                {%if plots != null %}
+                <if(plots)>
                 本章节需要包含的情节:
-                {{plots}}
-                {%endif%}
+                <plots>
+                </if>
                 
-                {%if relevantInfo != null %}
+                <if(relevantInfo)>
                 相关背景信息:
-                {{relevantInfo}}
-                {%endif%}
+                <relevantInfo>
+                </if>
                 
-                {%if existingContent != null %}
+                <if(existingContent)>
                 已有内容（需要续写）:
-                {{existingContent}}
-                {%endif%}
+                <existingContent>
+                </if>
                 
-                请根据上述信息，{%if existingContent != null %}续写{%else%}创作{%endif%}本章节内容。
+                请根据上述信息，<if(existingContent)>续写<else>创作</if>本章节内容。
                 """;
                 
-        // 添加已有内容（如果有）
-        if (request.getExistingContent() != null && !request.getExistingContent().isEmpty()) {
-            contextMap.put("existingContent", request.getExistingContent());
-        }
-        
         // 生成上下文提示词
         SystemPromptTemplate promptTemplate = new SystemPromptTemplate(contextPrompt);
         Message contextMessage = promptTemplate.createMessage(contextMap);
         String formattedPrompt = contextMessage.getText();
+        
+        // 打印上下文参数和最终提示词，便于排查
+        log.info("[章节内容生成] contextMap: {}", contextMap);
+        log.info("[章节内容生成] 最终提示词:\n{}", formattedPrompt);
+        
         messages.add(new UserMessage(formattedPrompt));
         
         // 添加自定义提示词（如果有）
