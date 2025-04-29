@@ -65,4 +65,9 @@ public class ChapterContentRequest {
      * 是否流式生成
      */
     private Boolean streamGeneration;
+    
+    /**
+     * 是否为追加模式 (true: 将生成的内容追加到已有内容后; false: 覆盖已有内容)
+     */
+    private Boolean appendMode;
 } 

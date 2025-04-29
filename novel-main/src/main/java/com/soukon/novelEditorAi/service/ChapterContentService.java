@@ -26,7 +26,18 @@ public interface ChapterContentService {
      * 保存生成的章节内容
      * @param chapterId 章节ID
      * @param content 生成的内容
+     * @param appendMode 是否追加模式（true表示追加，false表示覆盖）
      * @return 是否保存成功
      */
-    boolean saveChapterContent(Long chapterId, String content);
+    boolean saveChapterContent(Long chapterId, String content, Boolean appendMode);
+    
+    /**
+     * 保存生成的章节内容（默认覆盖模式）
+     * @param chapterId 章节ID
+     * @param content 生成的内容
+     * @return 是否保存成功
+     */
+    default boolean saveChapterContent(Long chapterId, String content) {
+        return saveChapterContent(chapterId, content, false);
+    }
 } 

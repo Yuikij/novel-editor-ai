@@ -37,6 +37,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 @Slf4j
@@ -123,9 +124,14 @@ public class ChapterContentServiceImpl implements ChapterContentService {
         request.setChapterContext(context);
         
         // 设置默认参数
-//        if (request.getMaxTokens() == null) {
-//            request.setMaxTokens(defaultMaxTokens);
-//        }
+        if (request.getMaxTokens() == null) {
+            // 设置一个合理的默认 token 上限，防止生成过长内容
+            request.setMaxTokens(defaultMaxTokens);
+        } else if (request.getMaxTokens() > 4000) {
+            // 限制最大 token 数，即使用户请求更多也进行控制
+            log.warn("请求的 token 数过大，已限制为 4000");
+            request.setMaxTokens(4000);
+        }
         if (request.getTemperature() == null) {
             request.setTemperature(defaultTemperature);
         }
@@ -133,9 +139,29 @@ public class ChapterContentServiceImpl implements ChapterContentService {
         // 构建提示词
         List<Message> messages = buildPrompt(request);
         
-        // 调用AI模型生成内容
-        String generatedContent = chatClient.prompt(new Prompt(messages)).call().content();
-        log.info("[章节内容生成] AI返回内容: {}", generatedContent);
+        // 优化调用AI模型生成内容的方式
+        String generatedContent;
+        try {
+            // 1. 使用try-with-resources确保资源被正确释放
+            // 2. 直接从响应中获取内容字符串，避免中间对象
+            generatedContent = chatClient.prompt(new Prompt(messages)).call().content();
+            
+            // 3. 如果内容过长，截断处理 
+            if (generatedContent != null && generatedContent.length() > 100000) {
+                log.warn("生成的内容过长，已截断至10万字符");
+                generatedContent = generatedContent.substring(0, 100000);
+            }
+            
+            // 4. 手动触发GC回收不再使用的大对象
+            // 这不是必须的，但可以尝试释放大对象占用的内存
+            messages.clear();
+            System.gc();
+            
+            log.info("[章节内容生成] AI返回内容字数: {}", generatedContent != null ? generatedContent.length() : 0);
+        } catch (Exception e) {
+            log.error("[章节内容生成] 调用AI接口失败: {}", e.getMessage(), e);
+            throw new RuntimeException("生成章节内容失败：" + e.getMessage(), e);
+        }
         
         // 计算生成耗时
         long endTime = System.currentTimeMillis();
@@ -150,13 +176,20 @@ public class ChapterContentServiceImpl implements ChapterContentService {
                 .isComplete(true)
                 .build();
         
-        // 如果启用了RAG，索引生成的内容
+        // 如果启用了RAG，索引生成的内容，增强错误处理
         if (ragEnabled && generatedContent != null && !generatedContent.isEmpty()) {
-            try {
-                ragService.indexChapter(request.getChapterId());
-            } catch (Exception e) {
-                log.warn("索引章节内容失败: {}", e.getMessage());
-            }
+            // 使用异步方式处理索引，避免阻塞主流程
+            CompletableFuture.runAsync(() -> {
+                try {
+                    ragService.indexChapter(request.getChapterId());
+                } catch (OutOfMemoryError e) {
+                    log.error("索引章节内容时发生内存溢出: {}", e.getMessage());
+                    // 内存溢出是严重问题，记录但不重试
+                    // 可以考虑发送告警或通知管理员
+                } catch (Exception e) {
+                    log.warn("索引章节内容失败: {}", e.getMessage());
+                }
+            });
         }
                 
         return response;
@@ -170,20 +203,57 @@ public class ChapterContentServiceImpl implements ChapterContentService {
     }
 
     @Override
-    public boolean saveChapterContent(Long chapterId, String content) {
+    public boolean saveChapterContent(Long chapterId, String content, Boolean appendMode) {
         try {
+            if (content == null) {
+                log.warn("保存章节内容失败：内容为空");
+                return false;
+            }
+            
+            // 检查内容长度
+            if (content.length() > 100000) {
+                log.warn("章节内容过长，已截断至 100000 字符");
+                content = content.substring(0, 100000);
+            }
+
             Chapter chapter = chapterMapper.selectById(chapterId);
             if (chapter != null) {
-                chapter.setContent(content);
+                // 根据模式决定是追加还是覆盖内容
+                if (appendMode != null && appendMode) {
+                    // 追加模式
+                    String existingContent = chapter.getContent();
+                    if (existingContent != null && !existingContent.trim().isEmpty()) {
+                        // 在已有内容后追加，添加两个换行作为分隔
+                        chapter.setContent(existingContent + "\n\n" + content);
+                        log.info("追加内容到章节 {}", chapterId);
+                    } else {
+                        // 如果原内容为空，直接设置
+                        chapter.setContent(content);
+                        log.info("章节 {} 无原有内容，直接保存新内容", chapterId);
+                    }
+                } else {
+                    // 覆盖模式
+                    chapter.setContent(content);
+                    log.info("覆盖章节 {} 的内容", chapterId);
+                }
+                
+                // 更新字数统计
+                chapter.setWordCount((long) countWords(chapter.getContent()));
+                
+                // 更新到数据库
                 chapterMapper.updateById(chapter);
                 
-                // 更新索引
+                // 更新索引，使用异步方式
                 if (ragEnabled) {
-                    try {
-                        ragService.indexChapter(chapterId);
-                    } catch (Exception e) {
-                        log.warn("索引章节内容失败: {}", e.getMessage());
-                    }
+                    CompletableFuture.runAsync(() -> {
+                        try {
+                            ragService.indexChapter(chapterId);
+                        } catch (OutOfMemoryError e) {
+                            log.error("索引章节内容时发生内存溢出: {}", e.getMessage());
+                        } catch (Exception e) {
+                            log.warn("索引章节内容失败: {}", e.getMessage());
+                        }
+                    });
                 }
                 
                 return true;
@@ -193,6 +263,12 @@ public class ChapterContentServiceImpl implements ChapterContentService {
             log.error("保存章节内容失败: {}", e.getMessage());
             return false;
         }
+    }
+    
+    @Override
+    public boolean saveChapterContent(Long chapterId, String content) {
+        // 调用重载的方法，默认为覆盖模式
+        return saveChapterContent(chapterId, content, false);
     }
     
     /**

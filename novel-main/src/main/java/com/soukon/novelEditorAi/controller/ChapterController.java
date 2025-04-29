@@ -145,6 +145,7 @@ public class ChapterController {
      * @param regenerate 是否重新生成
      * @param minWords 最小字数
      * @param stylePrompt 风格提示
+     * @param appendMode 是否追加模式（true: 追加到已有内容后; false: 覆盖原有内容）
      * @return 生成的章节内容
      */
     @GetMapping("/generate")
@@ -153,9 +154,11 @@ public class ChapterController {
             @RequestParam("projectId") Long projectId,
             @RequestParam(value = "regenerate", required = false, defaultValue = "false") Boolean regenerate,
             @RequestParam(value = "minWords", required = false, defaultValue = "500") Integer minWords,
-            @RequestParam(value = "stylePrompt", required = false) String stylePrompt) {
+            @RequestParam(value = "stylePrompt", required = false) String stylePrompt,
+            @RequestParam(value = "appendMode", required = false, defaultValue = "true") Boolean appendMode) {
         
-        log.info("生成章节内容，章节ID: {}, 项目ID: {}, 重新生成: {}", chapterId, projectId, regenerate);
+        log.info("生成章节内容，章节ID: {}, 项目ID: {}, 重新生成: {}, 追加模式: {}", 
+                chapterId, projectId, regenerate, appendMode);
         
         try {
             // 创建章节内容生成请求
@@ -163,12 +166,13 @@ public class ChapterController {
             request.setChapterId(chapterId);
             request.setPrompt(stylePrompt);
             request.setMaxTokens(minWords * 2); // 大致估算token数
+            request.setAppendMode(appendMode);
             
             // 生成章节内容
             ChapterContentResponse response = chapterContentService.generateChapterContent(request);
             
-            // 保存生成的内容（可选）
-             chapterContentService.saveChapterContent(chapterId, response.getContent());
+            // 保存生成的内容
+            chapterContentService.saveChapterContent(chapterId, response.getContent(), appendMode);
             
             return Result.success(response);
         } catch (Exception e) {
@@ -209,17 +213,19 @@ public class ChapterController {
      * 保存章节内容
      * @param chapterId 章节ID
      * @param content 章节内容
+     * @param appendMode 是否为追加模式（true: 追加到已有内容后; false: 覆盖原有内容）
      * @return 保存结果
      */
     @PostMapping("/save")
     public Result<Boolean> saveChapterContent(
             @RequestParam("chapterId") Long chapterId,
+            @RequestParam(value = "appendMode", required = false, defaultValue = "false") Boolean appendMode,
             @RequestBody String content) {
         
-        log.info("保存章节内容，章节ID: {}", chapterId);
+        log.info("保存章节内容，章节ID: {}, 追加模式: {}", chapterId, appendMode);
         
         try {
-            boolean success = chapterContentService.saveChapterContent(chapterId, content);
+            boolean success = chapterContentService.saveChapterContent(chapterId, content, appendMode);
             if (success) {
                 return Result.success(true);
             } else {

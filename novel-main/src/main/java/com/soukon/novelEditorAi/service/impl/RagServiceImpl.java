@@ -97,6 +97,14 @@ public class RagServiceImpl implements RagService {
                 log.warn("章节 {} 没有内容，跳过索引", chapterId);
                 return true;
             }
+            
+            // 限制处理的文本长度，避免内存溢出
+            final int MAX_INDEXABLE_LENGTH = 50000; // 设置最大可索引长度
+            if (content.length() > MAX_INDEXABLE_LENGTH) {
+                log.warn("章节 {} 内容过长 ({}字符)，将只索引前 {} 字符", 
+                        chapterId, content.length(), MAX_INDEXABLE_LENGTH);
+                content = content.substring(0, MAX_INDEXABLE_LENGTH);
+            }
 
             // 将章节内容分块
             List<String> chunks = chunkText(content, chunkSize, chunkOverlap);
@@ -239,7 +247,7 @@ public class RagServiceImpl implements RagService {
     }
 
     /**
-     * 将文本分块
+     * 将文本分块，优化内存使用
      */
     private List<String> chunkText(String text, int chunkSize, int overlap) {
         List<String> chunks = new ArrayList<>();
@@ -253,54 +261,90 @@ public class RagServiceImpl implements RagService {
             return chunks;
         }
 
+        // 估计分块数量并预分配容量，减少动态扩容
+        int estimatedChunks = (textLength / (chunkSize - overlap)) + 1;
+        chunks = new ArrayList<>(estimatedChunks);
+
         int start = 0;
         while (start < textLength) {
+            // 计算结束位置，避免越界
             int end = Math.min(start + chunkSize, textLength);
-
-            // 如果不是最后一块且不在句子边界，尝试在句子边界处截断
+            
+            // 优化边界查找逻辑
             if (end < textLength) {
-                int sentenceEnd = findSentenceBoundary(text, end);
-                if (sentenceEnd > 0) {
+                // 限制搜索范围，避免过度搜索
+                int searchLimit = Math.min(50, end - start); // 最多向前/后搜索50个字符
+                int sentenceEnd = findOptimizedSentenceBoundary(text, end, searchLimit);
+                if (sentenceEnd > start) { // 确保边界有效
                     end = sentenceEnd;
                 }
             }
-
-            chunks.add(text.substring(start, end));
-
+            
+            // 安全创建子字符串
+            String chunk = null;
+            try {
+                chunk = text.substring(start, end);
+            } catch (OutOfMemoryError e) {
+                log.error("创建文本块时内存溢出，位置: [{}, {}], 文本总长度: {}", start, end, textLength);
+                // 创建一个更小的块，或者放弃当前块
+                if (end - start > 1000) {
+                    end = start + 1000; // 尝试更小的块大小
+                    chunk = text.substring(start, end);
+                } else {
+                    // 如果即使很小的块也无法创建，则跳过
+                    break;
+                }
+            }
+            
+            if (chunk != null) {
+                chunks.add(chunk);
+            }
+            
             // 下一个块的起始位置，考虑重叠
             start = end - overlap;
-            if (start < 0) {
-                start = 0;
+            if (start < 0 || start >= end) { // 确保进度是向前的
+                start = end;
+            }
+            
+            // 控制块数量，防止无限循环
+            if (chunks.size() >= 2 * estimatedChunks) {
+                log.warn("块数量超过预期，可能有循环问题，强制结束: {}/{}", chunks.size(), estimatedChunks);
+                break;
             }
         }
 
         return chunks;
     }
-
+    
     /**
-     * 查找句子边界
+     * 优化的句子边界查找方法
      */
-    private int findSentenceBoundary(String text, int around) {
-        // 向前查找100个字符以内的句子结束符
-        int forward = Math.min(around + 100, text.length());
-        for (int i = around; i < forward; i++) {
-            char c = text.charAt(i);
-            if (c == '。' || c == '！' || c == '？' || c == '.' || c == '!' || c == '?') {
+    private int findOptimizedSentenceBoundary(String text, int position, int searchLimit) {
+        // 向前查找指定范围内的句子结束符
+        int forward = Math.min(position + searchLimit, text.length());
+        for (int i = position; i < forward; i++) {
+            if (isSentenceEnd(text.charAt(i))) {
                 return i + 1;
             }
         }
 
-        // 向后查找100个字符以内的句子结束符
-        int backward = Math.max(around - 100, 0);
-        for (int i = around; i > backward; i--) {
-            char c = text.charAt(i);
-            if (c == '。' || c == '！' || c == '？' || c == '.' || c == '!' || c == '?') {
+        // 向后查找指定范围内的句子结束符
+        int backward = Math.max(position - searchLimit, 0);
+        for (int i = position; i > backward; i--) {
+            if (isSentenceEnd(text.charAt(i))) {
                 return i + 1;
             }
         }
 
         // 没找到句子边界，直接返回原位置
-        return around;
+        return position;
+    }
+    
+    /**
+     * 判断字符是否为句子结束符
+     */
+    private boolean isSentenceEnd(char c) {
+        return c == '。' || c == '！' || c == '？' || c == '.' || c == '!' || c == '?';
     }
 
     /**
