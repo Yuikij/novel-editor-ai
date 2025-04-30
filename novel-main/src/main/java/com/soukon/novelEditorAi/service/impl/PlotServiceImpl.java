@@ -4,12 +4,17 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.soukon.novelEditorAi.entities.Plot;
 import com.soukon.novelEditorAi.mapper.PlotMapper;
 import com.soukon.novelEditorAi.service.PlotService;
+import com.soukon.novelEditorAi.service.CharacterService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
 public class PlotServiceImpl extends ServiceImpl<PlotMapper, Plot> implements PlotService {
     // MyBatis-Plus provides basic CRUD operations through ServiceImpl
     // You can implement custom methods here if needed
+    
+    @Autowired
+    private CharacterService characterService;
     
     /**
      * 生成用于构建生成请求 Prompt 的单个情节信息。
@@ -22,12 +27,32 @@ public class PlotServiceImpl extends ServiceImpl<PlotMapper, Plot> implements Pl
         if (plot == null) {
             return "";
         }
-        
         StringBuilder sb = new StringBuilder();
-        if (plot.getDescription() != null && !plot.getDescription().isEmpty()) {
-            sb.append("- ").append(plot.getDescription()).append("\n");
+        if (plot.getTitle() != null && !plot.getTitle().isEmpty()) {
+            sb.append("情节标题: ").append(plot.getTitle()).append("\n");
         }
-        // 可以根据需要添加 title 或 type 等信息
+        if (plot.getType() != null && !plot.getType().isEmpty()) {
+            sb.append("类型: ").append(plot.getType()).append("\n");
+        }
+        if (plot.getDescription() != null && !plot.getDescription().isEmpty()) {
+            sb.append("描述: ").append(plot.getDescription()).append("\n");
+        }
+        if (plot.getCharacterIds() != null && !plot.getCharacterIds().isEmpty()) {
+            sb.append("涉及角色: ");
+            for (Long cid : plot.getCharacterIds()) {
+                String name = null;
+                if (cid != null) {
+                    com.soukon.novelEditorAi.entities.Character character = characterService.getById(cid);
+                    name = (character != null && character.getName() != null) ? character.getName() : ("ID[" + cid + "]");
+                }
+                sb.append(name).append(", ");
+            }
+            // 去掉最后一个逗号和空格
+            if (sb.length() > 0 && sb.charAt(sb.length() - 2) == ',') {
+                sb.delete(sb.length() - 2, sb.length());
+            }
+            sb.append("\n");
+        }
         return sb.toString();
     }
 } 

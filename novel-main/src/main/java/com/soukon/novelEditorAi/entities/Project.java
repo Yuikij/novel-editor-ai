@@ -28,6 +28,8 @@ public class Project {
     private List<String> tags;
     
     private String targetAudience;
+    //  类型结构
+    private String type;
     private Long wordCountGoal;
     
     @TableField(typeHandler = JacksonTypeHandler.class)

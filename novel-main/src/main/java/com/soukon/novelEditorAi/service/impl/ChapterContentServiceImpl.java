@@ -5,6 +5,7 @@ import com.soukon.novelEditorAi.entities.Project;
 import com.soukon.novelEditorAi.entities.Character;
 import com.soukon.novelEditorAi.entities.Plot;
 import com.soukon.novelEditorAi.entities.World;
+import com.soukon.novelEditorAi.entities.CharacterRelationship;
 import com.soukon.novelEditorAi.mapper.ChapterMapper;
 import com.soukon.novelEditorAi.mapper.CharacterMapper;
 import com.soukon.novelEditorAi.mapper.PlotMapper;
@@ -20,6 +21,7 @@ import com.soukon.novelEditorAi.service.ChapterService;
 import com.soukon.novelEditorAi.service.WorldService;
 import com.soukon.novelEditorAi.service.CharacterService;
 import com.soukon.novelEditorAi.service.PlotService;
+import com.soukon.novelEditorAi.service.CharacterRelationshipService;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
@@ -60,6 +62,7 @@ public class ChapterContentServiceImpl implements ChapterContentService {
     private final WorldService worldService;
     private final CharacterService characterService;
     private final PlotService plotService;
+    private final CharacterRelationshipService characterRelationshipService;
 
     @Value("${novel.chapter.default-max-tokens:2000}")
     private Integer defaultMaxTokens;
@@ -101,7 +104,8 @@ public class ChapterContentServiceImpl implements ChapterContentService {
                                      ChapterService chapterService,
                                      WorldService worldService,
                                      CharacterService characterService,
-                                     PlotService plotService) {
+                                     PlotService plotService,
+                                     CharacterRelationshipService characterRelationshipService) {
         this.chatClient = ChatClient.builder(openAiChatModel)
                 .defaultAdvisors(
                         new SimpleLoggerAdvisor()
@@ -123,6 +127,7 @@ public class ChapterContentServiceImpl implements ChapterContentService {
         this.worldService = worldService;
         this.characterService = characterService;
         this.plotService = plotService;
+        this.characterRelationshipService = characterRelationshipService;
     }
 
     @Override
@@ -333,6 +338,12 @@ public class ChapterContentServiceImpl implements ChapterContentService {
             contextBuilder.characters(characters);
         }
         
+        // 获取角色关系
+        List<CharacterRelationship> relationships = characterRelationshipService.getByProjectId(projectId);
+        if (relationships != null && !relationships.isEmpty()) {
+            contextBuilder.characterRelationships(relationships);
+        }
+        
         // 获取前一章节
         if (chapter.getSortOrder() > 1) {
             Chapter previousChapter = chapterMapper.selectByProjectIdAndOrder(
@@ -395,6 +406,13 @@ public class ChapterContentServiceImpl implements ChapterContentService {
             userPromptBuilder.append("主要角色:\n");
             context.getCharacters().forEach(character -> userPromptBuilder.append(characterService.toPrompt(character)));
             userPromptBuilder.append("\n"); // 添加空行分隔
+        }
+
+        // 角色关系信息
+        if (context.getCharacterRelationships() != null && !context.getCharacterRelationships().isEmpty()) {
+            userPromptBuilder.append("角色关系:\n");
+            context.getCharacterRelationships().forEach(rel -> userPromptBuilder.append(characterRelationshipService.toPrompt(rel)));
+            userPromptBuilder.append("\n");
         }
 
         // 本章情节

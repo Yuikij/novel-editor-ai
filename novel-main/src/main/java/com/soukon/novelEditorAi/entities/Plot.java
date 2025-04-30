@@ -23,7 +23,8 @@ public class Plot {
     private String title;
     private String description;
     private Integer sortOrder;
-    private String type; // main, subplot, backstory, etc.
+    //  类型结构
+    private String type;
     
     @TableField(typeHandler = JacksonTypeHandler.class)
     private List<Long> characterIds;

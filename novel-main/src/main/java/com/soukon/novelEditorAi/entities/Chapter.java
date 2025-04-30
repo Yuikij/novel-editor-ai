@@ -24,6 +24,8 @@ public class Chapter {
     private Long wordCountGoal; // 目标字数
     private Long wordCount; // 实际字数
     private String content; // 章节内容
+    //  类型结构
+    private String type;
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdAt; // 创建时间
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
