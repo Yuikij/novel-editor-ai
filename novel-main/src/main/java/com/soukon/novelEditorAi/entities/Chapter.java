@@ -15,19 +15,19 @@ public class Chapter {
     @TableId(value = "id", type = IdType.ASSIGN_ID)
     private Long id;
     
-    private Long projectId;
-    private String title;
-    private Integer sortOrder;
-    private String status; // Enum: 'draft', 'in-progress', 'completed', 'edited'
-    private String summary;
-    private String notes;
-    private Long wordCountGoal;
-    private Long wordCount;
-    private String content;
+    private Long projectId; // 项目ID
+    private String title; // 章节标题
+    private Integer sortOrder; // 排序顺序
+    private String status; // 章节状态，枚举值：'draft'（草稿），'in-progress'（进行中），'completed'（已完成），'edited'（已编辑）
+    private String summary; // 章节摘要
+    private String notes; // 章节备注或背景信息
+    private Long wordCountGoal; // 目标字数
+    private Long wordCount; // 实际字数
+    private String content; // 章节内容
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    private LocalDateTime createdAt;
+    private LocalDateTime createdAt; // 创建时间
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    private LocalDateTime updatedAt;
+    private LocalDateTime updatedAt; // 更新时间
     
     /**
      * 生成用于构建生成请求 Prompt 的章节信息部分。
