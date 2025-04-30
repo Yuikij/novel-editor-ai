@@ -32,18 +32,4 @@ public class Plot {
     private LocalDateTime createdAt;
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updatedAt;
-    
-    /**
-     * 生成用于构建生成请求 Prompt 的单个情节信息。
-     *
-     * @return 包含情节描述的字符串，以列表项格式输出。
-     */
-    public String toPrompt() {
-        StringBuilder sb = new StringBuilder();
-        if (description != null && !description.isEmpty()) {
-            sb.append("- ").append(description).append("\n");
-        }
-        // 可以根据需要添加 title 或 type 等信息
-        return sb.toString();
-    }
 } 

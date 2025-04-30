@@ -15,6 +15,11 @@ import com.soukon.novelEditorAi.model.chapter.ChapterContentResponse;
 import com.soukon.novelEditorAi.model.chapter.ChapterContext;
 import com.soukon.novelEditorAi.service.ChapterContentService;
 import com.soukon.novelEditorAi.service.RagService;
+import com.soukon.novelEditorAi.service.ProjectService;
+import com.soukon.novelEditorAi.service.ChapterService;
+import com.soukon.novelEditorAi.service.WorldService;
+import com.soukon.novelEditorAi.service.CharacterService;
+import com.soukon.novelEditorAi.service.PlotService;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
@@ -50,6 +55,11 @@ public class ChapterContentServiceImpl implements ChapterContentService {
     private final CharacterMapper characterMapper;
     private final PlotMapper plotMapper;
     private final RagService ragService;
+    private final ProjectService projectService;
+    private final ChapterService chapterService;
+    private final WorldService worldService;
+    private final CharacterService characterService;
+    private final PlotService plotService;
 
     @Value("${novel.chapter.default-max-tokens:2000}")
     private Integer defaultMaxTokens;
@@ -86,30 +96,33 @@ public class ChapterContentServiceImpl implements ChapterContentService {
                                      WorldMapper worldMapper,
                                      CharacterMapper characterMapper,
                                      PlotMapper plotMapper,
-                                     RagService ragService) {
+                                     RagService ragService,
+                                     ProjectService projectService,
+                                     ChapterService chapterService,
+                                     WorldService worldService,
+                                     CharacterService characterService,
+                                     PlotService plotService) {
         this.chatClient = ChatClient.builder(openAiChatModel)
-                // 实现 Chat Memory 的 Advisor
-                // 在使用 Chat Memory 时，需要指定对话 ID，以便 Spring AI 处理上下文。
-//                .defaultAdvisors(
-//                        new MessageChatMemoryAdvisor(new InMemoryChatMemory())
-//                )
-                // 实现 Logger 的 Advisor
                 .defaultAdvisors(
                         new SimpleLoggerAdvisor()
                 )
-                // 设置 ChatClient 中 ChatModel 的 Options 参数
                 .defaultOptions(
                         OpenAiChatOptions.builder()
                                 .topP(0.7)
                                 .build()
                 )
-                .build();;
+                .build();
         this.projectMapper = projectMapper;
         this.chapterMapper = chapterMapper;
         this.worldMapper = worldMapper;
         this.characterMapper = characterMapper;
         this.plotMapper = plotMapper;
         this.ragService = ragService;
+        this.projectService = projectService;
+        this.chapterService = chapterService;
+        this.worldService = worldService;
+        this.characterService = characterService;
+        this.plotService = plotService;
     }
 
     @Override
@@ -360,34 +373,34 @@ public class ChapterContentServiceImpl implements ChapterContentService {
 
         // 项目信息
         if (context.getProject() != null) {
-            userPromptBuilder.append(context.getProject().toPrompt());
+            userPromptBuilder.append(projectService.toPrompt(context.getProject()));
             userPromptBuilder.append("\n"); // 添加空行分隔
         }
 
         // 章节信息
         String previousChapterSummary = context.getPreviousChapter() != null ? context.getPreviousChapter().getSummary() : null;
         if (context.getCurrentChapter() != null) {
-            userPromptBuilder.append(context.getCurrentChapter().toPrompt(previousChapterSummary));
+            userPromptBuilder.append(chapterService.toPrompt(context.getCurrentChapter(), previousChapterSummary));
             userPromptBuilder.append("\n"); // 添加空行分隔
         }
 
         // 世界观信息
         if (context.getWorld() != null) {
-            userPromptBuilder.append(context.getWorld().toPrompt());
+            userPromptBuilder.append(worldService.toPrompt(context.getWorld()));
             userPromptBuilder.append("\n"); // 添加空行分隔
         }
 
         // 角色信息
         if (context.getCharacters() != null && !context.getCharacters().isEmpty()) {
             userPromptBuilder.append("主要角色:\n");
-            context.getCharacters().forEach(character -> userPromptBuilder.append(character.toPrompt()));
+            context.getCharacters().forEach(character -> userPromptBuilder.append(characterService.toPrompt(character)));
             userPromptBuilder.append("\n"); // 添加空行分隔
         }
 
         // 本章情节
         if (context.getChapterPlots() != null && !context.getChapterPlots().isEmpty()) {
             userPromptBuilder.append("本章节需要包含的情节:\n");
-            context.getChapterPlots().forEach(plot -> userPromptBuilder.append(plot.toPrompt()));
+            context.getChapterPlots().forEach(plot -> userPromptBuilder.append(plotService.toPrompt(plot)));
             userPromptBuilder.append("\n"); // 添加空行分隔
         }
 

@@ -47,43 +47,4 @@ public class Character {
 
     @TableField(exist = false)
     private List<com.soukon.novelEditorAi.entities.CharacterRelationship> relationships;
-
-    /**
-     * 生成用于构建生成请求 Prompt 的单个角色信息。
-     *
-     * @return 包含角色姓名和描述的字符串。
-     */
-    public String toPrompt() {
-        StringBuilder sb = new StringBuilder();
-        if (name != null && !name.isEmpty()) {
-            sb.append("- ").append(name);
-            if (description != null && !description.isEmpty()) {
-                sb.append("角色描述: ").append(description);
-            }
-            if (background != null && !background.isEmpty()) {
-                sb.append(" (角色背景: ").append(background).append(")");
-            }
-            if (notes != null && !notes.isEmpty()) {
-                sb.append(" (角色备注: ").append(notes).append(")");
-            }
-            if (goals != null && !goals.isEmpty()) {
-                sb.append(" (角色目标: ").append(String.join(", ", goals)).append(")");
-            }
-            if (role != null) {
-                sb.append(" (角色类型: ").append(role).append(")");
-            }
-            if (age != null) {
-                sb.append(" (角色年龄: ").append(age).append(")");
-            }
-            if (gender != null) {
-                sb.append(" (角色性别: ").append(gender).append(")");
-            }
-            if (personality != null && !personality.isEmpty()) {
-                sb.append(" (角色性格: ").append(String.join(", ", personality)).append(")");
-            }
-
-            sb.append("\n");
-        }
-        return sb.toString();
-    }
 } 
