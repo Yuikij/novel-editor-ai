@@ -519,7 +519,7 @@ public class ChapterContentServiceImpl implements ChapterContentService {
             
             return relevantInfo.toString();
         } catch (Exception e) {
-            log.warn("检索相关信息失败: {}", e.getMessage());
+            log.warn("检索相关信息失败", e);
             return null;
         }
     }
