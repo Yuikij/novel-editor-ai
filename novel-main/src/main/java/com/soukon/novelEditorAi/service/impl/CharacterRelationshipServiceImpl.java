@@ -35,21 +35,21 @@ public class CharacterRelationshipServiceImpl extends ServiceImpl<CharacterRelat
         String targetName = null;
         if (relationship.getSourceCharacterId() != null) {
             Character source = characterService.getById(relationship.getSourceCharacterId());
-            sourceName = (source != null && source.getName() != null) ? source.getName() : ("ID[" + relationship.getSourceCharacterId() + "]");
+            sourceName = (source != null && source.getName() != null) ? source.getName() : null;
         }
         if (relationship.getTargetCharacterId() != null) {
             Character target = characterService.getById(relationship.getTargetCharacterId());
-            targetName = (target != null && target.getName() != null) ? target.getName() : ("ID[" + relationship.getTargetCharacterId() + "]");
+            targetName = (target != null && target.getName() != null) ? target.getName() : null;
         }
-        if (sourceName != null) {
-            sb.append(sourceName).append(" ");
+        // 如果任意一方查不到名称，则不输出该关系
+        if (sourceName == null || targetName == null) {
+            return "";
         }
+        sb.append(sourceName).append(" ");
         if (relationship.getRelationshipType() != null && !relationship.getRelationshipType().isEmpty()) {
             sb.append("与 ");
         }
-        if (targetName != null) {
-            sb.append(targetName).append(" ");
-        }
+        sb.append(targetName).append(" ");
         if (relationship.getRelationshipType() != null && !relationship.getRelationshipType().isEmpty()) {
             sb.append("关系: ").append(relationship.getRelationshipType());
         }

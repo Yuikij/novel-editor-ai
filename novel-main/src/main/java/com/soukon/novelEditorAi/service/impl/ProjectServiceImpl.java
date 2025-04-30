@@ -54,12 +54,6 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> impl
         if (project.getWritingRequirements() != null && !project.getWritingRequirements().isEmpty()) {
             sb.append("写作要求: ").append(String.join(", ", project.getWritingRequirements())).append("\n");
         }
-        if (project.getStatus() != null && !project.getStatus().isEmpty()) {
-            sb.append("项目状态: ").append(project.getStatus()).append("\n");
-        }
-        if (project.getWorldId() != null) {
-            sb.append("世界观ID: ").append(project.getWorldId()).append("\n");
-        }
         return sb.toString();
     }
 } 

@@ -70,4 +70,14 @@ public class ChapterContentRequest {
      * 是否为追加模式 (true: 将生成的内容追加到已有内容后; false: 覆盖已有内容)
      */
     private Boolean appendMode;
+    
+    /**
+     * 提示建议（如：写作风格、情感基调等建议）
+     */
+    private String promptSuggestion;
+    
+    /**
+     * 字数建议（如：希望生成的章节字数）
+     */
+    private Integer wordCountSuggestion;
 } 

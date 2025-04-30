@@ -2,6 +2,7 @@ package com.soukon.novelEditorAi.service;
 
 import com.soukon.novelEditorAi.model.chapter.ChapterContentRequest;
 import com.soukon.novelEditorAi.model.chapter.ChapterContentResponse;
+import reactor.core.publisher.Flux;
 
 /**
  * 章节内容生成服务接口
@@ -21,6 +22,11 @@ public interface ChapterContentService {
      * @return 生成的章节内容响应
      */
     ChapterContentResponse generateChapterContentStream(ChapterContentRequest request);
+    
+    /**
+     * 新增：流式生成章节内容，返回Flux<String>
+     */
+    Flux<String> generateChapterContentStreamFlux(ChapterContentRequest request);
     
     /**
      * 保存生成的章节内容

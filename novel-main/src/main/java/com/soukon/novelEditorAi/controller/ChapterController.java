@@ -146,6 +146,8 @@ public class ChapterController {
      * @param minWords 最小字数
      * @param stylePrompt 风格提示
      * @param appendMode 是否追加模式（true: 追加到已有内容后; false: 覆盖原有内容）
+     * @param promptSuggestion 提示建议
+     * @param wordCountSuggestion 字数建议
      * @return 生成的章节内容
      */
     @GetMapping("/generate")
@@ -155,11 +157,11 @@ public class ChapterController {
             @RequestParam(value = "regenerate", required = false, defaultValue = "false") Boolean regenerate,
             @RequestParam(value = "minWords", required = false, defaultValue = "500") Integer minWords,
             @RequestParam(value = "stylePrompt", required = false) String stylePrompt,
-            @RequestParam(value = "appendMode", required = false, defaultValue = "true") Boolean appendMode) {
-        
+            @RequestParam(value = "appendMode", required = false, defaultValue = "true") Boolean appendMode,
+            @RequestParam(value = "promptSuggestion", required = false) String promptSuggestion,
+            @RequestParam(value = "wordCountSuggestion", required = false) Integer wordCountSuggestion) {
         log.info("生成章节内容，章节ID: {}, 项目ID: {}, 重新生成: {}, 追加模式: {}", 
                 chapterId, projectId, regenerate, appendMode);
-        
         try {
             // 创建章节内容生成请求
             ChapterContentRequest request = new ChapterContentRequest();
@@ -167,13 +169,12 @@ public class ChapterController {
             request.setPrompt(stylePrompt);
             request.setMaxTokens(minWords * 2); // 大致估算token数
             request.setAppendMode(appendMode);
-            
+            request.setPromptSuggestion(promptSuggestion);
+            request.setWordCountSuggestion(wordCountSuggestion);
             // 生成章节内容
             ChapterContentResponse response = chapterContentService.generateChapterContent(request);
-            
             // 保存生成的内容
             chapterContentService.saveChapterContent(chapterId, response.getContent(), appendMode);
-            
             return Result.success(response);
         } catch (Exception e) {
             log.error("生成章节内容失败: {}", e.getMessage(), e);
@@ -186,27 +187,25 @@ public class ChapterController {
      * @param chapterId 章节ID
      * @param projectId 项目ID
      * @param response HTTP响应对象
+     * @param promptSuggestion 提示建议
+     * @param wordCountSuggestion 字数建议
      * @return 流式响应
      */
     @GetMapping("/generate/stream")
     public Flux<String> generateChapterContentStream(
             @RequestParam("chapterId") Long chapterId,
             @RequestParam("projectId") Long projectId,
-            HttpServletResponse response) {
-        
+            HttpServletResponse response,
+            @RequestParam(value = "promptSuggestion", required = false) String promptSuggestion,
+            @RequestParam(value = "wordCountSuggestion", required = false) Integer wordCountSuggestion) {
         response.setCharacterEncoding("UTF-8");
-        
         log.info("流式生成章节内容，章节ID: {}, 项目ID: {}", chapterId, projectId);
-        
-        // 创建章节内容生成请求
         ChapterContentRequest request = new ChapterContentRequest();
         request.setChapterId(chapterId);
         request.setStreamGeneration(true);
-        
-        // 这里简化处理，实际应用需要处理流式返回
-        chapterContentService.generateChapterContentStream(request);
-        
-        return Flux.just("正在生成章节内容，请稍候...");
+        request.setPromptSuggestion(promptSuggestion);
+        request.setWordCountSuggestion(wordCountSuggestion);
+        return chapterContentService.generateChapterContentStreamFlux(request);
     }
 
     /**

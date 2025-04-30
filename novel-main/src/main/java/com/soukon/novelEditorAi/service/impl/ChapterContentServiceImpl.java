@@ -22,6 +22,7 @@ import com.soukon.novelEditorAi.service.WorldService;
 import com.soukon.novelEditorAi.service.CharacterService;
 import com.soukon.novelEditorAi.service.PlotService;
 import com.soukon.novelEditorAi.service.CharacterRelationshipService;
+import com.soukon.novelEditorAi.service.OutlinePlotPointService;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
@@ -38,6 +39,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
+import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -63,6 +65,7 @@ public class ChapterContentServiceImpl implements ChapterContentService {
     private final CharacterService characterService;
     private final PlotService plotService;
     private final CharacterRelationshipService characterRelationshipService;
+    private final OutlinePlotPointService outlinePlotPointService;
 
     @Value("${novel.chapter.default-max-tokens:2000}")
     private Integer defaultMaxTokens;
@@ -105,7 +108,8 @@ public class ChapterContentServiceImpl implements ChapterContentService {
                                      WorldService worldService,
                                      CharacterService characterService,
                                      PlotService plotService,
-                                     CharacterRelationshipService characterRelationshipService) {
+                                     CharacterRelationshipService characterRelationshipService,
+                                     OutlinePlotPointService outlinePlotPointService) {
         this.chatClient = ChatClient.builder(openAiChatModel)
                 .defaultAdvisors(
                         new SimpleLoggerAdvisor()
@@ -128,6 +132,7 @@ public class ChapterContentServiceImpl implements ChapterContentService {
         this.characterService = characterService;
         this.plotService = plotService;
         this.characterRelationshipService = characterRelationshipService;
+        this.outlinePlotPointService = outlinePlotPointService;
     }
 
     @Override
@@ -422,6 +427,13 @@ public class ChapterContentServiceImpl implements ChapterContentService {
             userPromptBuilder.append("\n"); // 添加空行分隔
         }
 
+        // 大纲情节点信息
+        if (context.getPlotPoints() != null && !context.getPlotPoints().isEmpty()) {
+            userPromptBuilder.append("大纲情节点:\n");
+            context.getPlotPoints().forEach(point -> userPromptBuilder.append(outlinePlotPointService.toPrompt(point)));
+            userPromptBuilder.append("\n");
+        }
+
         // 相关背景信息 (RAG)
         String relevantInfo = retrieveRelevantInfo(request.getChapterId());
         if (relevantInfo != null && !relevantInfo.isEmpty()) {
@@ -522,5 +534,23 @@ public class ChapterContentServiceImpl implements ChapterContentService {
         // 对于中文，计算字符数；对于英文，计算单词数
         // 这里简单处理，实际应用中可能需要更复杂的逻辑
         return content.length();
+    }
+
+    @Override
+    public Flux<String> generateChapterContentStreamFlux(ChapterContentRequest request) {
+        // 构建上下文和提示词
+        validateRequest(request);
+        ChapterContext context = buildChapterContext(request.getChapterId());
+        request.setChapterContext(context);
+        List<Message> messages = buildPrompt(request);
+        StringBuilder contentBuilder = new StringBuilder();
+        Flux<String> contentFlux = chatClient.prompt(new Prompt(messages)).stream().content()
+//            .doOnNext(contentBuilder::append)
+//            .doOnComplete(() -> {
+//                // 流式内容全部生成后自动保存（覆盖模式）
+//                saveChapterContent(request.getChapterId(), contentBuilder.toString(), false);
+//            })
+                ;
+        return contentFlux;
     }
 } 
