@@ -28,7 +28,7 @@ public class CharacterServiceImpl extends ServiceImpl<CharacterMapper, Character
         if (character.getName() != null && !character.getName().isEmpty()) {
             sb.append("- ").append(character.getName());
             if (character.getDescription() != null && !character.getDescription().isEmpty()) {
-                sb.append("角色描述: ").append(character.getDescription());
+                sb.append(" (角色描述: ").append(character.getDescription()).append(")");
             }
             if (character.getBackground() != null && !character.getBackground().isEmpty()) {
                 sb.append(" (角色背景: ").append(character.getBackground()).append(")");

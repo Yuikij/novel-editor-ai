@@ -80,7 +80,7 @@ public class ChapterContentServiceImpl implements ChapterContentService {
     private Boolean ragEnabled;
 
     private static final String CHAPTER_CONTENT_PROMPT = """
-            你是一位专业的小说创作AI助手，擅长根据提供的上下文和要求编写小说章节内容。
+            你是一位专业的小说写作专家，擅长根据提供的上下文和要求编写小说章节内容。
             
             请根据提供的章节上下文信息，按照要求生成符合以下标准的章节内容：
             1. 内容必须符合小说风格、主题和设定
