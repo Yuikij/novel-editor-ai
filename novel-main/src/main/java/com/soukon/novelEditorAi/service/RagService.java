@@ -9,7 +9,14 @@ import java.util.List;
  * 提供文档索引和检索功能
  */
 public interface RagService {
-    
+
+
+    void createOrUpdateDocument(String content, String documentId);
+
+
+
+//   根据文档ID和查询文本检索相关文档
+    List<Document> retrieveByDocumentId(String documentId, String query);
     /**
      * 为项目创建或更新索引
      * @param projectId 项目ID

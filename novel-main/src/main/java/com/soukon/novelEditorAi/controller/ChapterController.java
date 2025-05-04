@@ -11,6 +11,7 @@ import com.soukon.novelEditorAi.service.ChapterContentService;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 
@@ -31,6 +32,10 @@ public class ChapterController {
 
     private final ChapterContentService chapterContentService;
 
+
+    @Value("${novel.chapter.default-words-count:5000}")
+    private Integer defaultWordsCount;
+
     @Autowired
     public ChapterController(ChapterContentService chapterContentService) {
         this.chapterContentService = chapterContentService;
@@ -41,7 +46,7 @@ public class ChapterController {
         List<Chapter> chapters = chapterService.list();
         return Result.success(chapters);
     }
-    
+
     @GetMapping("/project/{projectId}")
     public Result<List<Chapter>> listByProjectId(@PathVariable("projectId") Long projectId) {
         LambdaQueryWrapper<Chapter> queryWrapper = new LambdaQueryWrapper<>();
@@ -58,10 +63,10 @@ public class ChapterController {
             @RequestParam(value = "projectId", required = false, name = "projectId") Long projectId,
             @RequestParam(value = "title", required = false, name = "title") String title,
             @RequestParam(value = "status", required = false, name = "status") String status) {
-        
+
         Page<Chapter> pageInfo = new Page<>(page, pageSize);
         LambdaQueryWrapper<Chapter> queryWrapper = new LambdaQueryWrapper<>();
-        
+
         if (projectId != null) {
             queryWrapper.eq(Chapter::getProjectId, projectId);
         }
@@ -71,10 +76,10 @@ public class ChapterController {
         if (status != null && !status.isEmpty()) {
             queryWrapper.eq(Chapter::getStatus, status);
         }
-        
+
         queryWrapper.orderByAsc(Chapter::getProjectId).orderByAsc(Chapter::getSortOrder);
         chapterService.page(pageInfo, queryWrapper);
-        
+
         return Result.success(pageInfo);
     }
 
@@ -92,7 +97,7 @@ public class ChapterController {
         LocalDateTime now = LocalDateTime.now();
         chapter.setCreatedAt(now);
         chapter.setUpdatedAt(now);
-        
+
         // If order is not set, find the max order in the project and set to order+1
         if (chapter.getSortOrder() == null) {
             LambdaQueryWrapper<Chapter> queryWrapper = new LambdaQueryWrapper<>();
@@ -100,14 +105,14 @@ public class ChapterController {
             queryWrapper.orderByDesc(Chapter::getSortOrder);
             queryWrapper.last("LIMIT 1");
             Chapter lastChapter = chapterService.getOne(queryWrapper);
-            
+
             if (lastChapter != null) {
                 chapter.setSortOrder(lastChapter.getSortOrder() + 1);
             } else {
                 chapter.setSortOrder(1);
             }
         }
-        
+
         chapterService.save(chapter);
         return Result.success("Chapter created successfully", chapter);
     }
@@ -118,12 +123,12 @@ public class ChapterController {
         if (existingChapter == null) {
             return Result.error("Chapter not found with id: " + id);
         }
-        
+
         chapter.setId(id);
         chapter.setCreatedAt(existingChapter.getCreatedAt());
         chapter.setUpdatedAt(LocalDateTime.now());
         chapterService.updateById(chapter);
-        
+
         return Result.success("Chapter updated successfully", chapter);
     }
 
@@ -133,20 +138,21 @@ public class ChapterController {
         if (chapter == null) {
             return Result.error("Chapter not found with id: " + id);
         }
-        
+
         chapterService.removeById(id);
         return Result.success("Chapter deleted successfully", null);
     }
 
     /**
      * 生成章节内容
-     * @param chapterId 章节ID
-     * @param projectId 项目ID
-     * @param regenerate 是否重新生成
-     * @param minWords 最小字数
-     * @param stylePrompt 风格提示
-     * @param appendMode 是否追加模式（true: 追加到已有内容后; false: 覆盖原有内容）
-     * @param promptSuggestion 提示建议
+     *
+     * @param chapterId           章节ID
+     * @param projectId           项目ID
+     * @param regenerate          是否重新生成
+     * @param minWords            最小字数
+     * @param stylePrompt         风格提示
+     * @param appendMode          是否追加模式（true: 追加到已有内容后; false: 覆盖原有内容）
+     * @param promptSuggestion    提示建议
      * @param wordCountSuggestion 字数建议
      * @return 生成的章节内容
      */
@@ -160,7 +166,7 @@ public class ChapterController {
             @RequestParam(value = "appendMode", required = false, defaultValue = "true") Boolean appendMode,
             @RequestParam(value = "promptSuggestion", required = false) String promptSuggestion,
             @RequestParam(value = "wordCountSuggestion", required = false) Integer wordCountSuggestion) {
-        log.info("生成章节内容，章节ID: {}, 项目ID: {}, 重新生成: {}, 追加模式: {}", 
+        log.info("生成章节内容，章节ID: {}, 项目ID: {}, 重新生成: {}, 追加模式: {}",
                 chapterId, projectId, regenerate, appendMode);
         try {
             // 创建章节内容生成请求
@@ -184,10 +190,11 @@ public class ChapterController {
 
     /**
      * 流式生成章节内容
-     * @param chapterId 章节ID
-     * @param projectId 项目ID
-     * @param response HTTP响应对象
-     * @param promptSuggestion 提示建议
+     *
+     * @param chapterId           章节ID
+     * @param projectId           项目ID
+     * @param response            HTTP响应对象
+     * @param promptSuggestion    提示建议
      * @param wordCountSuggestion 字数建议
      * @return 流式响应
      */
@@ -203,15 +210,16 @@ public class ChapterController {
         ChapterContentRequest request = new ChapterContentRequest();
         request.setChapterId(chapterId);
         request.setStreamGeneration(true);
-        request.setPromptSuggestion(promptSuggestion);
-        request.setWordCountSuggestion(wordCountSuggestion);
+        request.setPromptSuggestion(promptSuggestion == null ? "无" : promptSuggestion);
+        request.setWordCountSuggestion(wordCountSuggestion == null ? defaultWordsCount : wordCountSuggestion);
         return chapterContentService.generateChapterContentStreamFlux(request);
     }
 
     /**
      * 保存章节内容
-     * @param chapterId 章节ID
-     * @param content 章节内容
+     *
+     * @param chapterId  章节ID
+     * @param content    章节内容
      * @param appendMode 是否为追加模式（true: 追加到已有内容后; false: 覆盖原有内容）
      * @return 保存结果
      */
@@ -220,9 +228,9 @@ public class ChapterController {
             @RequestParam("chapterId") Long chapterId,
             @RequestParam(value = "appendMode", required = false, defaultValue = "false") Boolean appendMode,
             @RequestBody String content) {
-        
+
         log.info("保存章节内容，章节ID: {}, 追加模式: {}", chapterId, appendMode);
-        
+
         try {
             boolean success = chapterContentService.saveChapterContent(chapterId, content, appendMode);
             if (success) {

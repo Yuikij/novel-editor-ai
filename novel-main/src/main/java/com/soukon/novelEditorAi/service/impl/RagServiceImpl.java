@@ -56,6 +56,71 @@ public class RagServiceImpl implements RagService {
     }
 
     @Override
+    public void createOrUpdateDocument(String content, String documentId) {
+        try {
+            // 检查内容是否有效
+            if (content == null || content.isEmpty()) {
+                log.warn("无法创建或更新文档：内容为空，文档ID: {}", documentId);
+                return;
+            }
+
+            // 先尝试删除现有文档（及其分块）
+            try {
+                String filterExpression = "id == \"" + documentId + "\"" + 
+                                        " || id like \"" + documentId + "-chunk-%\"";
+                vectorStore.delete(filterExpression);
+                log.debug("已删除现有文档: {}", documentId);
+            } catch (Exception e) {
+                // 如果删除失败，可能是文档不存在，继续创建
+                log.debug("删除现有文档时出现异常，可能是文档不存在: {}", documentId);
+            }
+
+            // 创建文档对象
+            Map<String, Object> metadata = new HashMap<>();
+            metadata.put("id", documentId);
+            metadata.put("type", "custom");
+            metadata.put("timestamp", System.currentTimeMillis());
+
+            Document document = new Document(documentId, content, metadata);
+            
+            // 添加到向量存储
+            vectorStore.add(Collections.singletonList(document));
+            
+            log.info("成功创建/更新文档: {}", documentId);
+        } catch (Exception e) {
+            log.error("创建/更新文档时发生错误: {}", e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public List<Document> retrieveByDocumentId(String documentId, String query) {
+        try {
+            if (query == null || query.isEmpty()) {
+                log.warn("查询为空，无法检索文档: {}", documentId);
+                return Collections.emptyList();
+            }
+
+            // 创建搜索请求，过滤特定文档ID
+            SearchRequest request = SearchRequest.builder()
+                    .query(query)
+                    .topK(5)  // 返回最相关的5个结果
+                    .similarityThreshold(0.7f)
+                    .filterExpression("id == \"" + documentId + "\"" + 
+                                     " || id like \"" + documentId + "-chunk-%\"")
+                    .build();
+
+            // 执行搜索
+            List<Document> results = vectorStore.similaritySearch(request);
+            
+            log.info("从文档 {} 检索到 {} 个相关结果", documentId, results.size());
+            return results;
+        } catch (Exception e) {
+            log.error("从文档检索时发生错误: {}", e.getMessage(), e);
+            return Collections.emptyList();
+        }
+    }
+
+    @Override
     public boolean indexProject(Long projectId) {
         try {
             Project project = projectMapper.selectById(projectId);

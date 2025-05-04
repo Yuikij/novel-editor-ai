@@ -48,7 +48,7 @@ public class PlotServiceImpl extends ServiceImpl<PlotMapper, Plot> implements Pl
                 sb.append(name).append(", ");
             }
             // 去掉最后一个逗号和空格
-            if (sb.length() > 0 && sb.charAt(sb.length() - 2) == ',') {
+            if (!sb.isEmpty() && sb.charAt(sb.length() - 2) == ',') {
                 sb.delete(sb.length() - 2, sb.length());
             }
             sb.append("\n");
