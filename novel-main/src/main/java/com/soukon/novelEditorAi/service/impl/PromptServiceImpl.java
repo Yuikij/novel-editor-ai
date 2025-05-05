@@ -3,11 +3,13 @@ package com.soukon.novelEditorAi.service.impl;
 import com.soukon.novelEditorAi.entities.Chapter;
 import com.soukon.novelEditorAi.model.chapter.ChapterContentRequest;
 import com.soukon.novelEditorAi.model.chapter.ChapterContext;
+import com.soukon.novelEditorAi.model.chapter.ReasoningRes;
 import com.soukon.novelEditorAi.service.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.ai.document.Document;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -59,9 +61,11 @@ public class PromptServiceImpl implements PromptService {
     @Override
     public List<Message> buildReasoningPrompt(ChapterContentRequest request) {
         ChapterContext context = request.getChapterContext();
+
         if (context == null) {
             throw new IllegalStateException("章节上下文未构建");
         }
+        BeanOutputConverter<ReasoningRes> converter = new BeanOutputConverter<>(ReasoningRes.class);
 
         // 系统提示词 - 引导AI进行推理分析
         String systemPrompt = """
@@ -76,7 +80,7 @@ public class PromptServiceImpl implements PromptService {
                 计划要求：
                 1. 仔细分析小说背景、角色、世界观和已有情节
                 2. 识别关键的情节要素、冲突点和情感线索
-                3. 根据情节的完成情况和完成百分比，以及需要续写或创作的字数要求，输出续写或创作之后的情节的完成情况和完成百分比
+                3. 找到当前正在写作的情节，续写并且酌情添加情节
                 3. 确定本章节在整体故事中的作用和目标
                 4. 设计合理的章节结构，包括起承转合
                 5. 制定角色对话、情节推进和环境描写的计划
@@ -84,16 +88,25 @@ public class PromptServiceImpl implements PromptService {
                 
                
                 请先思考，然后输出一个结构化的章节写作计划，包括：
-                - 内容一定要和当前的情节相吻合，不得写出超出当前情节规划的事情
+                - 内容一定要和当前的情节相吻合，如果目标字数过大可以新增情节，新增情节是当前情节完成后的延续
                 - 根据章节字数和目标输出字数，合理规划当前输出内容
                 - 核心主题和目标
                 - 情节架构和节奏
                 - 关键场景设计
                 - 角色互动计划
                 - 冲突和转折点设计
-                
                 你的分析和计划将作为下一步实际写作的指导。
-                """;
+                
+                然后输出写作完成之后的情节列表，注意：
+                - 根据情节的完成情况和完成百分比，以及需要续写或创作的字数要求，输出计划后的情节列表
+                - 只能修改已有的情节的完成百分比和完成情况，但是要考虑当前所属章节情况，务必局限在本章
+                - 如果目标字数过大可以新增情节，新增情节是当前情节完成后的延续
+                - 新增情节不能和之前情节的标题相同
+                - 理论上只能有一个情节的完成百分比不是100
+                - 输出的情节完成情况的百分比要与计划相符
+                
+                输出的格式为：{%s}
+                """.formatted(converter.getFormat());
 
         // 用户提示词 - 包含章节上下文信息
         StringBuilder userPromptBuilder = new StringBuilder();
@@ -136,13 +149,6 @@ public class PromptServiceImpl implements PromptService {
 
         // 第二部分：写作目标
         userPromptBuilder.append("## 2. 写作目标\n");
-        
-        // 本章情节目标
-        if (context.getChapterPlots() != null && !context.getChapterPlots().isEmpty()) {
-            userPromptBuilder.append("### 本章节需要包含的情节\n");
-            context.getChapterPlots().forEach(plot -> userPromptBuilder.append(plotService.toPrompt(plot)));
-            userPromptBuilder.append("\n");
-        }
 
         // 添加写作目标的具体要求
         Chapter currentChapter = context.getCurrentChapter();
@@ -166,6 +172,14 @@ public class PromptServiceImpl implements PromptService {
         String previousChapterSummary = context.getPreviousChapter() != null ? context.getPreviousChapter().getSummary() : null;
         if (currentChapter != null) {
             userPromptBuilder.append(chapterService.toPrompt(currentChapter, previousChapterSummary));
+            userPromptBuilder.append("\n");
+        }
+
+        //  第四部分  需要创作或续写章节包含的情节信息，包括情节的概述和情节的完成情况  
+        userPromptBuilder.append("## 4. 需要创作或续写章节包含的情节信息\n");
+        if (context.getChapterPlots() != null && !context.getChapterPlots().isEmpty()) {
+            userPromptBuilder.append("### 本章节需要包含的情节\n");
+            context.getChapterPlots().forEach(plot -> userPromptBuilder.append(plotService.toPrompt(plot)));
             userPromptBuilder.append("\n");
         }
         

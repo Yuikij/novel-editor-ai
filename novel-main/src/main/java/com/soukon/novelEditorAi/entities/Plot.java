@@ -25,7 +25,9 @@ public class Plot {
     private Integer sortOrder;
     //  类型结构
     private String type;
-    
+    private String status;
+    private Integer completionPercentage;
+
     @TableField(typeHandler = JacksonTypeHandler.class)
     private List<Long> characterIds;
 

@@ -37,6 +37,12 @@ public class PlotServiceImpl extends ServiceImpl<PlotMapper, Plot> implements Pl
         if (plot.getDescription() != null && !plot.getDescription().isEmpty()) {
             sb.append("描述: ").append(plot.getDescription()).append("\n");
         }
+        if (plot.getStatus() != null && !plot.getStatus().isEmpty()) {
+            sb.append("完成情况: ").append(plot.getStatus()).append("\n");
+        }
+        if (plot.getCompletionPercentage() != null) {
+            sb.append("完成百分比: ").append(plot.getCompletionPercentage()).append("\n");
+        }
         if (plot.getCharacterIds() != null && !plot.getCharacterIds().isEmpty()) {
             sb.append("涉及角色: ");
             for (Long cid : plot.getCharacterIds()) {
