@@ -112,34 +112,48 @@ public class PromptServiceImpl implements PromptService {
         StringBuilder userPromptBuilder = new StringBuilder();
         userPromptBuilder.append("请根据以下上下文信息，分析并制定本章节的写作计划：\n\n");
 
+        extracted(request, userPromptBuilder, context);
+
+        // 构建消息列表
+        List<Message> messages = new ArrayList<>();
+        messages.add(new SystemMessage(systemPrompt));
+        messages.add(new UserMessage(userPromptBuilder.toString()));
+
+        // 添加日志，输出推理阶段提示词内容
+        log.info("[Reasoning] 最终推理提示词(System):\n{}", systemPrompt);
+        log.info("[Reasoning] 最终推理提示词(User):\n{}", userPromptBuilder.toString());
+        return messages;
+    }
+
+    private void extracted(ChapterContentRequest request, StringBuilder userPromptBuilder, ChapterContext context) {
         // 第一部分：小说元数据
         userPromptBuilder.append("## 1. 小说元数据\n");
-        
+
         // 项目信息
         if (context.getProject() != null) {
             userPromptBuilder.append(projectService.toPrompt(context.getProject())).append("\n");
         }
-        
+
         // 世界观信息
         if (context.getWorld() != null) {
             userPromptBuilder.append("### 世界观信息\n");
             userPromptBuilder.append(worldService.toPrompt(context.getWorld())).append("\n");
         }
-        
+
         // 角色信息
         if (context.getCharacters() != null && !context.getCharacters().isEmpty()) {
             userPromptBuilder.append("### 主要角色\n");
             context.getCharacters().forEach(character -> userPromptBuilder.append(characterService.toPrompt(character)));
             userPromptBuilder.append("\n");
         }
-        
+
         // 角色关系信息
         if (context.getCharacterRelationships() != null && !context.getCharacterRelationships().isEmpty()) {
             userPromptBuilder.append("### 角色关系\n");
             context.getCharacterRelationships().forEach(rel -> userPromptBuilder.append(characterRelationshipService.toPrompt(rel)));
             userPromptBuilder.append("\n");
         }
-        
+
         // 大纲情节点信息
         if (context.getPlotPoints() != null && !context.getPlotPoints().isEmpty()) {
             userPromptBuilder.append("### 小说整体大纲\n");
@@ -167,7 +181,7 @@ public class PromptServiceImpl implements PromptService {
 
         // 第三部分：当前写作进度和章节信息
         userPromptBuilder.append("## 3. 当前写作进度和章节信息\n");
-        
+
         // 章节信息
         String previousChapterSummary = context.getPreviousChapter() != null ? context.getPreviousChapter().getSummary() : null;
         if (currentChapter != null) {
@@ -175,14 +189,14 @@ public class PromptServiceImpl implements PromptService {
             userPromptBuilder.append("\n");
         }
 
-        //  第四部分  需要创作或续写章节包含的情节信息，包括情节的概述和情节的完成情况  
+        //  第四部分  需要创作或续写章节包含的情节信息，包括情节的概述和情节的完成情况
         userPromptBuilder.append("## 4. 需要创作或续写章节包含的情节信息\n");
         if (context.getChapterPlots() != null && !context.getChapterPlots().isEmpty()) {
             userPromptBuilder.append("### 本章节需要包含的情节\n");
             context.getChapterPlots().forEach(plot -> userPromptBuilder.append(plotService.toPrompt(plot)));
             userPromptBuilder.append("\n");
         }
-        
+
         // 已有内容
         if (currentChapter != null && currentChapter.getContent() != null && !currentChapter.getContent().isEmpty()) {
             userPromptBuilder.append("### 已有内容\n");
@@ -200,16 +214,6 @@ public class PromptServiceImpl implements PromptService {
         if (relevantInfo != null && !relevantInfo.isEmpty()) {
             userPromptBuilder.append("### 相关背景信息\n").append(relevantInfo).append("\n");
         }
-
-        // 构建消息列表
-        List<Message> messages = new ArrayList<>();
-        messages.add(new SystemMessage(systemPrompt));
-        messages.add(new UserMessage(userPromptBuilder.toString()));
-
-        // 添加日志，输出推理阶段提示词内容
-        log.info("[Reasoning] 最终推理提示词(System):\n{}", systemPrompt);
-        log.info("[Reasoning] 最终推理提示词(User):\n{}", userPromptBuilder.toString());
-        return messages;
     }
 
     /**
