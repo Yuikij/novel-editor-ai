@@ -8,6 +8,7 @@ import com.soukon.novelEditorAi.service.CharacterRelationshipService;
 import com.soukon.novelEditorAi.service.CharacterService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
 import java.util.List;
 
 @Service
@@ -58,6 +59,22 @@ public class CharacterRelationshipServiceImpl extends ServiceImpl<CharacterRelat
         }
         sb.append("\n");
         return sb.toString();
+    }
+
+    @Override
+    public String toPrompt(Long projectId) {
+        // 获取角色关系
+        List<CharacterRelationship> relationships = lambdaQuery()
+                .eq(CharacterRelationship::getProjectId, projectId)
+                .list();
+        StringBuilder relationshipsInfo = new StringBuilder("角色关系:\n");
+        if (relationships != null && !relationships.isEmpty()) {
+            for (CharacterRelationship relationship : relationships) {
+                relationshipsInfo.append(toPrompt(relationship))
+                        .append("\n");
+            }
+        }
+        return relationshipsInfo.toString();
     }
 
     @Override

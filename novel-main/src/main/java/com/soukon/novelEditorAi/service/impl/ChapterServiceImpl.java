@@ -8,6 +8,8 @@ import com.soukon.novelEditorAi.service.ChapterService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 public class ChapterServiceImpl extends ServiceImpl<ChapterMapper, Chapter> implements ChapterService {
     // MyBatis-Plus provides basic CRUD operations through ServiceImpl
@@ -65,5 +67,62 @@ public class ChapterServiceImpl extends ServiceImpl<ChapterMapper, Chapter> impl
         }
         
         return sb.toString();
+    }
+    
+    /**
+     * 生成用于构建生成请求 Prompt 的章节信息部分，自动查询上一章节的摘要。
+     *
+     * @param chapter 章节实体
+     * @return 包含章节标题、摘要、背景和上一章节摘要的字符串。
+     */
+    @Override
+    public String toPrompt(Chapter chapter) {
+        if (chapter == null) {
+            return "";
+        }
+        
+        // 自动查询上一章节摘要
+        String previousChapterSummary = null;
+        Long projectId = chapter.getProjectId();
+        Integer sortOrder = chapter.getSortOrder();
+        
+        if (projectId != null && sortOrder != null && sortOrder > 1) {
+            // 查询上一章节
+            Chapter previousChapter = chapterMapper.selectByProjectIdAndOrder(projectId, sortOrder - 1);
+            if (previousChapter != null) {
+                previousChapterSummary = previousChapter.getSummary();
+            }
+        }
+        
+        // 调用现有方法生成提示内容
+        return toPrompt(chapter, previousChapterSummary);
+    }
+
+    @Override
+    public String toPromptProjectId(Long projectId) {
+        LambdaQueryWrapper<Chapter> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(Chapter::getProjectId, projectId);
+        queryWrapper.orderByAsc(Chapter::getSortOrder);
+        List<Chapter> chapters = list(queryWrapper);
+        StringBuilder chaptersInfo = new StringBuilder();
+        if (chapters != null && !chapters.isEmpty()) {
+
+            chaptersInfo.append("章节列表 (").append(chapters.size()).append("章):\n");
+            for (Chapter chapter : chapters) {
+                // 使用直接查库的toPrompt方法，自动获取上一章节摘要
+                chaptersInfo.append(toPrompt(chapter));
+                chaptersInfo.append("-----\n");
+            }
+        }
+        return chaptersInfo.toString();
+    }
+
+    @Override
+    public String toPromptChapterId(Long chapterId) {
+        StringBuilder chapterInfo = new StringBuilder("章节信息：\n");
+        Chapter chapter = getById(chapterId);
+        String prompt = toPrompt(chapter);
+        chapterInfo.append(prompt);
+        return chapterInfo.toString();
     }
 } 

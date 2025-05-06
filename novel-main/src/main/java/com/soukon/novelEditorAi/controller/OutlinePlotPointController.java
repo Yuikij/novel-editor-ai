@@ -4,12 +4,14 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.soukon.novelEditorAi.common.Result;
 import com.soukon.novelEditorAi.entities.OutlinePlotPoint;
+import com.soukon.novelEditorAi.model.outline.OutlineExpansionRequest;
 import com.soukon.novelEditorAi.service.OutlinePlotPointService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/outline-plot-points")
@@ -129,5 +131,93 @@ public class OutlinePlotPointController {
         
         outlinePlotPointService.removeById(id);
         return Result.success("Outline plot point deleted successfully", null);
+    }
+
+    /**
+     * 生成大纲情节点列表
+     * 
+     * @param projectId 项目ID
+     * @param context 小说上下文信息，包含世界观、角色、类型等
+     * @return 生成的大纲情节点列表
+     */
+    @PostMapping("/generate/{projectId}")
+    public Result<List<OutlinePlotPoint>> generateOutline(
+            @PathVariable("projectId") Long projectId,
+            @RequestBody Map<String, Object> context) {
+        try {
+            List<OutlinePlotPoint> generatedPoints = outlinePlotPointService.generateOutlinePlotPoints(projectId, context);
+            return Result.success("大纲生成成功", generatedPoints);
+        } catch (Exception e) {
+            return Result.error("大纲生成失败: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 根据项目ID自动获取上下文并生成大纲情节点列表
+     * 
+     * @param projectId 项目ID
+     * @return 生成的大纲情节点列表
+     */
+    @PostMapping("/auto-generate/{projectId}")
+    public Result<List<OutlinePlotPoint>> generateOutlineWithContext(@PathVariable("projectId") Long projectId) {
+        try {
+            List<OutlinePlotPoint> generatedPoints = outlinePlotPointService.generateOutlinePlotPointsWithContext(projectId);
+            return Result.success("大纲生成成功", generatedPoints);
+        } catch (Exception e) {
+            return Result.error("大纲生成失败: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 根据已有的大纲情节点，补全或扩展情节点列表
+     * 
+     * @param projectId 项目ID
+     * @param request 包含已有情节点ID列表和目标数量的请求体
+     * @return 补全后的情节点列表
+     */
+    @PostMapping("/expand/{projectId}")
+    public Result<List<OutlinePlotPoint>> expandOutline(
+            @PathVariable("projectId") Long projectId,
+            @RequestBody OutlineExpansionRequest request) {
+        try {
+            if (request == null) {
+                request = new OutlineExpansionRequest();
+            }
+            List<OutlinePlotPoint> expandedPoints = outlinePlotPointService.expandOutlinePlotPoints(
+                    projectId, request.getExistingPlotPointIds(), request.getTargetCount());
+            return Result.success("大纲扩展成功", expandedPoints);
+        } catch (Exception e) {
+            return Result.error("大纲扩展失败: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 简化版的大纲扩展，自动获取项目现有所有情节点并扩展到目标数量
+     * 
+     * @param projectId 项目ID
+     * @param targetCount 目标情节点总数
+     * @return 补全后的情节点列表
+     */
+    @PostMapping("/auto-expand/{projectId}")
+    public Result<List<OutlinePlotPoint>> autoExpandOutline(
+            @PathVariable("projectId") Long projectId,
+            @RequestParam(value = "targetCount", required = false, defaultValue = "12") Integer targetCount) {
+        try {
+            // 获取项目所有现有情节点ID
+            LambdaQueryWrapper<OutlinePlotPoint> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(OutlinePlotPoint::getProjectId, projectId);
+            queryWrapper.select(OutlinePlotPoint::getId);
+            List<Long> existingIds = this.outlinePlotPointService.list(queryWrapper)
+                    .stream()
+                    .map(OutlinePlotPoint::getId)
+                    .toList();
+            
+            // 调用扩展方法
+            List<OutlinePlotPoint> expandedPoints = outlinePlotPointService.expandOutlinePlotPoints(
+                    projectId, existingIds, targetCount);
+            return Result.success("大纲扩展成功", expandedPoints);
+        } catch (Exception e) {
+            return Result.error("大纲扩展失败: " + e.getMessage());
+        }
     }
 } 

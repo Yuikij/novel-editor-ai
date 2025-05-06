@@ -17,6 +17,10 @@ public interface CharacterRelationshipService extends IService<CharacterRelation
      */
     String toPrompt(CharacterRelationship relationship);
 
+
+
+    String toPrompt(Long projectId);
+
     /**
      * 根据项目ID获取角色关系列表
      */

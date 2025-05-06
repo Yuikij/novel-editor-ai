@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
 public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> implements ProjectService {
     // MyBatis-Plus provides basic CRUD operations through ServiceImpl
     // You can implement custom methods here if needed
-    
+
     /**
      * 生成用于构建生成请求 Prompt 的项目信息部分。
      *
@@ -22,7 +22,7 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> impl
         if (project == null) {
             return "";
         }
-        
+
         StringBuilder sb = new StringBuilder();
         if (project.getTitle() != null && !project.getTitle().isEmpty()) {
             sb.append("小说标题: ").append(project.getTitle()).append("\n");
@@ -55,5 +55,11 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> impl
             sb.append("写作要求: ").append(String.join(", ", project.getWritingRequirements())).append("\n");
         }
         return sb.toString();
+    }
+
+    @Override
+    public String toPrompt(Long projectId) {
+        Project project = getById(projectId);
+        return toPrompt(project);
     }
 } 

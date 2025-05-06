@@ -14,4 +14,13 @@ public interface ProjectService extends IService<Project> {
      * @return 包含小说标题、概要和风格的字符串。
      */
     String toPrompt(Project project);
+
+
+    /**
+     * 生成用于构建生成请求 Prompt 的项目 ID 信息部分。
+     *
+     * @param projectId 项目 ID
+     * @return 包含项目 ID 的字符串。
+     */
+    String toPrompt(Long projectId);
 } 

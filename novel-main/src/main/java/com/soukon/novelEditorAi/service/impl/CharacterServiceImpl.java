@@ -5,13 +5,14 @@ import com.soukon.novelEditorAi.entities.Character;
 import com.soukon.novelEditorAi.mapper.CharacterMapper;
 import com.soukon.novelEditorAi.service.CharacterService;
 import org.springframework.stereotype.Service;
+
 import java.util.List;
 
 @Service
 public class CharacterServiceImpl extends ServiceImpl<CharacterMapper, Character> implements CharacterService {
     // MyBatis-Plus provides basic CRUD operations through ServiceImpl
     // You can implement custom methods here if needed
-    
+
     /**
      * 生成用于构建生成请求 Prompt 的单个角色信息。
      *
@@ -23,7 +24,7 @@ public class CharacterServiceImpl extends ServiceImpl<CharacterMapper, Character
         if (character == null) {
             return "";
         }
-        
+
         StringBuilder sb = new StringBuilder();
         if (character.getName() != null && !character.getName().isEmpty()) {
             sb.append("- ").append(character.getName());
@@ -55,5 +56,20 @@ public class CharacterServiceImpl extends ServiceImpl<CharacterMapper, Character
             sb.append("\n");
         }
         return sb.toString();
+    }
+
+
+    public String toPrompt(Long projectId) {
+        // 获取角色信息
+        List<Character> characters = lambdaQuery()
+                .eq(Character::getProjectId, projectId)
+                .list();
+        StringBuilder charactersInfo = new StringBuilder("角色信息：\n");
+        if (characters != null && !characters.isEmpty()) {
+            for (Character character : characters) {
+                charactersInfo.append(toPrompt(character));
+            }
+        }
+        return charactersInfo.toString();
     }
 } 
