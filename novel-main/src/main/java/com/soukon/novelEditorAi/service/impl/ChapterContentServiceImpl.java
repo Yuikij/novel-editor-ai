@@ -419,26 +419,26 @@ public class ChapterContentServiceImpl implements ChapterContentService {
         // 构建推理指导提示词 - 使用PromptService
         List<Message> reasoningMessages = promptService.buildReasoningPrompt(request);
 
-        // 执行推理过程，分析章节要求并制定写作计划
-        String reasoningResult;
-        try {
-            log.info("[Reasoning] 正在分析章节要求并制定写作计划");
-            reasoningResult = chatClient.prompt(new Prompt(reasoningMessages)).call().content();
-            log.info("[Reasoning] 完成章节分析和写作计划，长度: {}", reasoningResult != null ? reasoningResult.length() : 0);
-        } catch (Exception e) {
-            log.error("[Reasoning] 章节分析失败: {}", e.getMessage(), e);
-            throw new RuntimeException("分析章节要求失败：" + e.getMessage(), e);
-        }
-
-        // 第二阶段：Acting - 根据分析结果执行写作
-        log.info("[Acting] 开始根据分析结果生成章节内容");
-
-        // 构建执行提示词，将推理结果融入提示中 - 使用PromptService
-        List<Message> actingMessages = promptService.buildActingPrompt(request, reasoningResult);
+//        // 执行推理过程，分析章节要求并制定写作计划
+//        String reasoningResult;
+//        try {
+//            log.info("[Reasoning] 正在分析章节要求并制定写作计划");
+//            reasoningResult = chatClient.prompt(new Prompt(reasoningMessages)).call().content();
+//            log.info("[Reasoning] 完成章节分析和写作计划，长度: {}", reasoningResult != null ? reasoningResult.length() : 0);
+//        } catch (Exception e) {
+//            log.error("[Reasoning] 章节分析失败: {}", e.getMessage(), e);
+//            throw new RuntimeException("分析章节要求失败：" + e.getMessage(), e);
+//        }
+//
+//        // 第二阶段：Acting - 根据分析结果执行写作
+//        log.info("[Acting] 开始根据分析结果生成章节内容");
+//
+//        // 构建执行提示词，将推理结果融入提示中 - 使用PromptService
+//        List<Message> actingMessages = promptService.buildActingPrompt(request, reasoningResult);
 
         // 调用AI模型生成实际章节内容
         log.info("[Acting] 正在以流式方式生成章节内容");
-        Flux<String> contentFlux = chatClient.prompt(new Prompt(actingMessages)).stream().content();
+        Flux<String> contentFlux = chatClient.prompt(new Prompt(reasoningMessages)).stream().content();
 
         // 计算生成耗时
         long endTime = System.currentTimeMillis();

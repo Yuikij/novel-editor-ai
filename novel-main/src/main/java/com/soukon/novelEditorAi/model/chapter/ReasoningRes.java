@@ -7,8 +7,6 @@ import java.util.List;
 
 @Data
 public class ReasoningRes {
-    @JsonPropertyDescription("结构化的章节写作计划")
-    String writingPlan;
-    @JsonPropertyDescription("写作完成之后的情节情况")
+    @JsonPropertyDescription("规划后的情节列表")
     List<PlotRes> plotList;
 }

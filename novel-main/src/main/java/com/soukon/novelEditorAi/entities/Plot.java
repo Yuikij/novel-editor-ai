@@ -27,6 +27,8 @@ public class Plot {
     private String type;
     private String status;
     private Integer completionPercentage;
+//    目标字数
+    private Integer wordCountGoal;
 
     @TableField(typeHandler = JacksonTypeHandler.class)
     private List<Long> characterIds;

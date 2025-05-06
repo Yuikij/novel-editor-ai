@@ -46,7 +46,7 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> impl
             sb.append("目标受众: ").append(project.getTargetAudience()).append("\n");
         }
         if (project.getWordCountGoal() != null) {
-            sb.append("目标字数: ").append(project.getWordCountGoal()).append("\n");
+            sb.append("目标字数: ").append(project.getWordCountGoal()).append("（必须严格遵守，优先级高于章节目标字数或其他字数要求）\n");
         }
         if (project.getHighlights() != null && !project.getHighlights().isEmpty()) {
             sb.append("亮点: ").append(String.join(", ", project.getHighlights())).append("\n");
