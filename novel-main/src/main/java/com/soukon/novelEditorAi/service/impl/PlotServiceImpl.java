@@ -47,6 +47,9 @@ public class PlotServiceImpl extends ServiceImpl<PlotMapper, Plot> implements Pl
         if (plot.getCompletionPercentage() != null) {
             sb.append("完成百分比: ").append(plot.getCompletionPercentage()).append("\n");
         }
+        if (plot.getWordCountGoal() != null) {
+            sb.append("目标字数: ").append(plot.getWordCountGoal()).append("\n");
+        }
         if (plot.getCharacterIds() != null && !plot.getCharacterIds().isEmpty()) {
             sb.append("涉及角色: ");
             for (Long cid : plot.getCharacterIds()) {
