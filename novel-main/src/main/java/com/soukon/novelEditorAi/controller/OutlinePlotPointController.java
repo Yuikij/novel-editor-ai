@@ -133,62 +133,14 @@ public class OutlinePlotPointController {
         return Result.success("Outline plot point deleted successfully", null);
     }
 
-    /**
-     * 生成大纲情节点列表
-     * 
-     * @param projectId 项目ID
-     * @param context 小说上下文信息，包含世界观、角色、类型等
-     * @return 生成的大纲情节点列表
-     */
-    @PostMapping("/generate/{projectId}")
-    public Result<List<OutlinePlotPoint>> generateOutline(
-            @PathVariable("projectId") Long projectId,
-            @RequestBody Map<String, Object> context) {
-        try {
-            List<OutlinePlotPoint> generatedPoints = outlinePlotPointService.generateOutlinePlotPoints(projectId, context);
-            return Result.success("大纲生成成功", generatedPoints);
-        } catch (Exception e) {
-            return Result.error("大纲生成失败: " + e.getMessage());
+    @DeleteMapping("/batch")
+    public Result<Void> batchDelete(@RequestBody List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return Result.error("IDs list cannot be empty");
         }
-    }
-    
-    /**
-     * 根据项目ID自动获取上下文并生成大纲情节点列表
-     * 
-     * @param projectId 项目ID
-     * @return 生成的大纲情节点列表
-     */
-    @PostMapping("/auto-generate/{projectId}")
-    public Result<List<OutlinePlotPoint>> generateOutlineWithContext(@PathVariable("projectId") Long projectId) {
-        try {
-            List<OutlinePlotPoint> generatedPoints = outlinePlotPointService.generateOutlinePlotPointsWithContext(projectId);
-            return Result.success("大纲生成成功", generatedPoints);
-        } catch (Exception e) {
-            return Result.error("大纲生成失败: " + e.getMessage());
-        }
-    }
-    
-    /**
-     * 根据已有的大纲情节点，补全或扩展情节点列表
-     * 
-     * @param projectId 项目ID
-     * @param request 包含已有情节点ID列表和目标数量的请求体
-     * @return 补全后的情节点列表
-     */
-    @PostMapping("/expand/{projectId}")
-    public Result<List<OutlinePlotPoint>> expandOutline(
-            @PathVariable("projectId") Long projectId,
-            @RequestBody OutlineExpansionRequest request) {
-        try {
-            if (request == null) {
-                request = new OutlineExpansionRequest();
-            }
-            List<OutlinePlotPoint> expandedPoints = outlinePlotPointService.expandOutlinePlotPoints(
-                    projectId, request.getExistingPlotPointIds(), request.getTargetCount());
-            return Result.success("大纲扩展成功", expandedPoints);
-        } catch (Exception e) {
-            return Result.error("大纲扩展失败: " + e.getMessage());
-        }
+        
+        outlinePlotPointService.removeByIds(ids);
+        return Result.success("Batch delete successful", null);
     }
     
     /**

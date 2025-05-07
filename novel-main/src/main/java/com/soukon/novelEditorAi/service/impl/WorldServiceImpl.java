@@ -1,5 +1,6 @@
 package com.soukon.novelEditorAi.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.soukon.novelEditorAi.entities.World;
 import com.soukon.novelEditorAi.mapper.WorldMapper;
@@ -52,5 +53,10 @@ public class WorldServiceImpl extends ServiceImpl<WorldMapper, World> implements
             sb.append("备注: ").append(world.getNotes()).append("\n");
         }
         return sb.toString();
+    }
+
+    @Override
+    public String toPrompt(Long worldId) {
+        return toPrompt(getById(worldId));
     }
 } 

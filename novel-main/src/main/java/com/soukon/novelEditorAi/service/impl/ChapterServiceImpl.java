@@ -106,7 +106,6 @@ public class ChapterServiceImpl extends ServiceImpl<ChapterMapper, Chapter> impl
         List<Chapter> chapters = list(queryWrapper);
         StringBuilder chaptersInfo = new StringBuilder();
         if (chapters != null && !chapters.isEmpty()) {
-
             chaptersInfo.append("章节列表 (").append(chapters.size()).append("章):\n");
             for (Chapter chapter : chapters) {
                 // 使用直接查库的toPrompt方法，自动获取上一章节摘要

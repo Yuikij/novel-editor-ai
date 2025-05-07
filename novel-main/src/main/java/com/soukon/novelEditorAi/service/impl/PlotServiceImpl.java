@@ -1,12 +1,16 @@
 package com.soukon.novelEditorAi.service.impl;
 
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.soukon.novelEditorAi.entities.Chapter;
 import com.soukon.novelEditorAi.entities.Plot;
 import com.soukon.novelEditorAi.mapper.PlotMapper;
 import com.soukon.novelEditorAi.service.PlotService;
 import com.soukon.novelEditorAi.service.CharacterService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Service
 public class PlotServiceImpl extends ServiceImpl<PlotMapper, Plot> implements PlotService {
@@ -60,5 +64,20 @@ public class PlotServiceImpl extends ServiceImpl<PlotMapper, Plot> implements Pl
             sb.append("\n");
         }
         return sb.toString();
+    }
+
+    @Override
+    public String toPrompt(Long chapterId) {
+        List<Plot> plots = list(lambdaQuery().eq(Plot::getChapterId, chapterId));
+        StringBuilder plotsInfo = new StringBuilder();
+        if (plots != null && !plots.isEmpty()) {
+            plotsInfo.append("情节列表").append(":\n");
+            for (Plot plot : plots) {
+                // 使用直接查库的toPrompt方法，自动获取上一章节摘要
+                plotsInfo.append(toPrompt(plot));
+                plotsInfo.append("-----\n");
+            }
+        }
+        return plotsInfo.toString();
     }
 } 

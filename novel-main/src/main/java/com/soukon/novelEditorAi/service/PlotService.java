@@ -14,4 +14,14 @@ public interface PlotService extends IService<Plot> {
      * @return 包含情节描述的字符串，以列表项格式输出。
      */
     String toPrompt(Plot plot);
+
+
+
+    /**
+     * 生成用于构建生成请求 Prompt 的情节信息部分。
+     *
+     * @param chapterId 章节 ID
+     * @return 包含情节描述的字符串，以列表项格式输出。
+     */
+    String toPrompt(Long chapterId);
 } 

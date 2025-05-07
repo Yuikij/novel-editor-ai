@@ -18,22 +18,6 @@ public interface OutlinePlotPointService extends IService<OutlinePlotPoint> {
      */
     String toPrompt(OutlinePlotPoint point);
 
-    /**
-     * 根据小说上下文生成大纲情节点列表
-     *
-     * @param projectId 项目ID
-     * @param context 小说上下文信息，包含世界观、角色、类型等
-     * @return 生成的大纲情节点列表
-     */
-    List<OutlinePlotPoint> generateOutlinePlotPoints(Long projectId, Map<String, Object> context);
-
-    /**
-     * 根据项目ID自动获取上下文并生成大纲情节点列表
-     *
-     * @param projectId 项目ID
-     * @return 生成的大纲情节点列表
-     */
-    List<OutlinePlotPoint> generateOutlinePlotPointsWithContext(Long projectId);
 
     /**
      * 根据已有的大纲情节点，补全或扩展情节点列表

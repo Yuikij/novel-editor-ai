@@ -165,7 +165,7 @@ public class PromptServiceImpl implements PromptService {
         Chapter currentChapter = context.getCurrentChapter();
         if (currentChapter != null) {
             userPromptBuilder.append("### 写作要求\n");
-            userPromptBuilder.append("- 目标字数：").append(request.getWordCountSuggestion()).append("字\n");
+            userPromptBuilder.append("- 目标字数：").append(request.getWordCountSuggestion()).append("字（必须严格遵守，优先级高于章节目标字数或其他字数要求）\n");
             if (currentChapter.getContent() != null && !currentChapter.getContent().isEmpty()) {
                 userPromptBuilder.append("- 类型：续写\n");
             } else {

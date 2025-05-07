@@ -42,7 +42,6 @@ public class OutlinePlotPointServiceImpl extends ServiceImpl<OutlinePlotPointMap
     private final ObjectMapper objectMapper;
     
     private final ProjectService projectService;
-    private final WorldService worldService;
     private final CharacterService characterService;
     private final CharacterRelationshipService characterRelationshipService;
     private final ChapterService chapterService;
@@ -58,7 +57,6 @@ public class OutlinePlotPointServiceImpl extends ServiceImpl<OutlinePlotPointMap
         this.openAiChatModel = openAiChatModel;
         this.objectMapper = objectMapper;
         this.projectService = projectService;
-        this.worldService = worldService;
         this.characterService = characterService;
         this.characterRelationshipService = characterRelationshipService;
         this.chapterService = chapterService;
@@ -89,113 +87,8 @@ public class OutlinePlotPointServiceImpl extends ServiceImpl<OutlinePlotPointMap
         return sb.toString();
     }
 
-    // 根据小说上下文生成大纲列表
-    @Override
-    public List<OutlinePlotPoint> generateOutlinePlotPoints(Long projectId, Map<String, Object> context) {
-        // 调用LLM生成大纲情节点
-        List<OutlinePlotPoint> generatedPoints = callLlmForOutlineGeneration(projectId, context);
-        
-        // 设置基本属性并保存到数据库
-        int sortOrder = 1;
-        LocalDateTime now = LocalDateTime.now();
-        
-        for (OutlinePlotPoint point : generatedPoints) {
-            point.setProjectId(projectId);
-            point.setSortOrder(sortOrder++);
-            point.setCreatedAt(now);
-            point.setUpdatedAt(now);
-            // 保存到数据库
-            this.save(point);
-        }
-        
-        return generatedPoints;
-    }
-    
-    /**
-     * 调用LLM生成大纲情节点列表
-     * 
-     * @param projectId 项目ID
-     * @param context 小说上下文信息，包含世界观、角色、类型等
-     * @return 生成的大纲情节点列表
-     */
-    private List<OutlinePlotPoint> callLlmForOutlineGeneration(Long projectId, Map<String, Object> context) {
-        // 系统提示词 - 引导AI生成大纲
-        String systemPrompt = """
-                你是一位专业的小说大纲设计专家，擅长为各类型小说创建结构清晰、引人入胜的故事大纲。
-                
-                请根据提供的小说背景信息，生成一个包含8-15个关键情节点的故事大纲。每个情节点应该简明扼要地描述故事的关键转折和发展。
-                
-                遵循以下规则:
-                1. 情节点应涵盖经典故事结构：起始、发展、高潮和结局
-                2. 每个情节点提供简洁但有足够信息量的标题和描述
-                3. 情节发展应该连贯且符合逻辑，遵循合理的因果关系
-                4. 情节应当与提供的背景、人物和世界观保持一致
-                5. 确保情节点之间有明确的连接和发展关系
-                
-                返回格式必须是结构化的JSON数组，每个情节点包含以下字段：
-                [
-                  {
-                    "title": "情节点标题",
-                    "type": "起始|发展|高潮|结局|其他", 
-                    "description": "详细描述这个情节点的内容和意义"
-                  },
-                  ...
-                ]
-                
-                请确保创建的大纲既有创意又符合小说的类型和主题。
-                """;
-        
-        // 构建用户提示词
-        StringBuilder userPromptBuilder = new StringBuilder();
-        userPromptBuilder.append("请根据以下小说信息，生成一个完整的故事大纲：\n\n");
-        
-        // 添加小说上下文信息
-        context.forEach((key, value) -> {
-            if (value != null && !value.toString().isEmpty()) {
-                userPromptBuilder.append(key).append(": ").append(value).append("\n");
-            }
-        });
-        
-        // 构建消息列表
-        List<Message> messages = new ArrayList<>();
-        messages.add(new SystemMessage(systemPrompt));
-        messages.add(new UserMessage(userPromptBuilder.toString()));
-        
-        try {
-            // 调用LLM获取响应
-            ChatClient chatClient = ChatClient.builder(openAiChatModel)
-                    .defaultAdvisors(new SimpleLoggerAdvisor())
-                    .defaultOptions(
-                            OpenAiChatOptions.builder()
-                                    .temperature(0.7)
-                                    .build()
-                    )
-                    .build();
-                    
-            String response = chatClient.prompt(new Prompt(messages)).call().content();
-            
-            // 解析JSON响应
-            return objectMapper.readValue(response, new TypeReference<List<OutlinePlotPoint>>() {});
-        } catch (Exception e) {
-            log.error("生成大纲情节点失败", e);
-            throw new RuntimeException("调用AI生成大纲失败: " + e.getMessage());
-        }
-    }
 
-    /**
-     * 根据项目ID自动获取上下文并生成大纲情节点列表
-     *
-     * @param projectId 项目ID
-     * @return 生成的大纲情节点列表
-     */
-    @Override
-    public List<OutlinePlotPoint> generateOutlinePlotPointsWithContext(Long projectId) {
-        // 构建小说上下文信息
-        Map<String, Object> context = buildNovelContext(projectId);
-        
-        // 调用已实现的方法生成大纲情节点
-        return generateOutlinePlotPoints(projectId, context);
-    }
+
     
     /**
      * 构建小说上下文信息
@@ -212,20 +105,8 @@ public class OutlinePlotPointServiceImpl extends ServiceImpl<OutlinePlotPointMap
             if (project == null) {
                 throw new IllegalArgumentException("找不到指定的项目: " + projectId);
             }
-            
             // 添加项目基本信息
-            context.put("小说标题", project.getTitle());
-            context.put("小说概要", project.getSynopsis());
-            context.put("小说风格", project.getStyle());
-            
-            // 获取世界观信息
-            if (project.getWorldId() != null) {
-                World world = worldService.getById(project.getWorldId());
-                if (world != null) {
-                    context.put("世界观名称", world.getName());
-                    context.put("世界观描述", world.getDescription());
-                }
-            }
+            context.put("项目基本信息", projectService.toPrompt(project));
             
             // 获取角色信息
             context.put("主要角色", characterService.toPrompt(projectId));
@@ -233,25 +114,8 @@ public class OutlinePlotPointServiceImpl extends ServiceImpl<OutlinePlotPointMap
             // 获取角色关系
             context.put("角色关系", characterRelationshipService.toPrompt(projectId));
 
-            // 获取章节信息（如有）
-            LambdaQueryWrapper<Chapter> queryWrapper = new LambdaQueryWrapper<>();
-            queryWrapper.eq(Chapter::getProjectId, projectId);
-            queryWrapper.orderByAsc(Chapter::getSortOrder);
-            List<Chapter> chapters = chapterService.list(queryWrapper);
-            
-            if (chapters != null && !chapters.isEmpty()) {
-                StringBuilder chaptersInfo = new StringBuilder();
-                chaptersInfo.append("章节列表 (").append(chapters.size()).append("章):\n");
-                
-                for (Chapter chapter : chapters) {
-                    // 使用直接查库的toPrompt方法，自动获取上一章节摘要
-                    chaptersInfo.append(chapterService.toPrompt(chapter));
-                    chaptersInfo.append("-----\n");
-                }
-                
-                context.put("章节信息", chaptersInfo.toString());
-            }
-
+            // 获取章节信息
+            context.put("章节信息", chapterService.toPromptProjectId(projectId));
             return context;
         } catch (Exception e) {
             log.error("构建小说上下文失败", e);
@@ -342,7 +206,7 @@ public class OutlinePlotPointServiceImpl extends ServiceImpl<OutlinePlotPointMap
                 [
                   {
                     "title": "情节点标题",
-                    "type": "起始|发展|高潮|结局|其他", 
+                    "type": "起始|发展|高潮|结局|其他",
                     "description": "详细描述这个情节点的内容和意义"
                   },
                   ...
@@ -384,7 +248,7 @@ public class OutlinePlotPointServiceImpl extends ServiceImpl<OutlinePlotPointMap
         List<Message> messages = new ArrayList<>();
         messages.add(new SystemMessage(systemPrompt));
         messages.add(new UserMessage(userPromptBuilder.toString()));
-        
+        log.info("AI扩展大纲情节点请求: {}", messages);
         try {
             // 调用LLM获取响应
             ChatClient chatClient = ChatClient.builder(openAiChatModel)
@@ -397,7 +261,7 @@ public class OutlinePlotPointServiceImpl extends ServiceImpl<OutlinePlotPointMap
                     .build();
                     
             String response = chatClient.prompt(new Prompt(messages)).call().content();
-            
+            log.info("AI扩展大纲情节点响应: {}", response);
             // 解析JSON响应
             return objectMapper.readValue(response, new TypeReference<List<OutlinePlotPoint>>() {});
         } catch (Exception e) {

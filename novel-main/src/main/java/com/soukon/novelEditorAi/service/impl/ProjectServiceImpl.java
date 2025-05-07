@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.soukon.novelEditorAi.entities.Project;
 import com.soukon.novelEditorAi.mapper.ProjectMapper;
 import com.soukon.novelEditorAi.service.ProjectService;
+import com.soukon.novelEditorAi.service.WorldService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -11,6 +13,8 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> impl
     // MyBatis-Plus provides basic CRUD operations through ServiceImpl
     // You can implement custom methods here if needed
 
+    @Autowired
+    private WorldService worldService;
     /**
      * 生成用于构建生成请求 Prompt 的项目信息部分。
      *
@@ -46,13 +50,17 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> impl
             sb.append("目标受众: ").append(project.getTargetAudience()).append("\n");
         }
         if (project.getWordCountGoal() != null) {
-            sb.append("目标字数: ").append(project.getWordCountGoal()).append("（必须严格遵守，优先级高于章节目标字数或其他字数要求）\n");
+            sb.append("目标字数: ").append(project.getWordCountGoal()).append("\n");
         }
         if (project.getHighlights() != null && !project.getHighlights().isEmpty()) {
             sb.append("亮点: ").append(String.join(", ", project.getHighlights())).append("\n");
         }
         if (project.getWritingRequirements() != null && !project.getWritingRequirements().isEmpty()) {
             sb.append("写作要求: ").append(String.join(", ", project.getWritingRequirements())).append("\n");
+        }
+
+        if (project.getWorldId() != null ) {
+            sb.append("世界观: ").append(worldService.toPrompt(project.getWorldId())).append("\n");
         }
         return sb.toString();
     }

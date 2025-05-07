@@ -14,4 +14,14 @@ public interface WorldService extends IService<World> {
      * @return 包含世界观名称和描述的字符串。
      */
     String toPrompt(World world);
+
+
+    /**
+     * 生成用于构建生成请求 Prompt 的世界观信息部分。
+     *
+     * @param worldId 世界观 ID
+     * @return 包含世界观名称和描述的字符串。
+     */
+    String toPrompt(Long worldId);
+
 } 
