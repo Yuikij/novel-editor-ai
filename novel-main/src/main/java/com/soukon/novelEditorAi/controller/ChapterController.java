@@ -144,6 +144,54 @@ public class ChapterController {
     }
 
     /**
+     * 批量删除章节
+     *
+     * @param ids 章节ID列表
+     * @return 删除结果
+     */
+    @DeleteMapping("/batch")
+    public Result<Void> batchDelete(@RequestBody List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return Result.error("IDs list cannot be empty");
+        }
+        
+        chapterService.removeByIds(ids);
+        return Result.success("批量删除成功", null);
+    }
+
+    /**
+     * 自动补全或扩展章节列表到目标数量
+     * 
+     * @param projectId 项目ID
+     * @param targetCount 目标章节总数
+     * @return 补全后的章节列表
+     */
+    @PostMapping("/auto-expand/{projectId}")
+    public Result<List<Chapter>> autoExpandChapters(
+            @PathVariable("projectId") Long projectId,
+            @RequestParam(value = "targetCount", required = false, defaultValue = "12") Integer targetCount) {
+        log.info("自动扩展章节，项目ID: {}, 目标数量: {}", projectId, targetCount);
+        try {
+            // 获取项目所有现有章节ID
+            LambdaQueryWrapper<Chapter> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(Chapter::getProjectId, projectId);
+            queryWrapper.select(Chapter::getId);
+            List<Long> existingIds = this.chapterService.list(queryWrapper)
+                    .stream()
+                    .map(Chapter::getId)
+                    .toList();
+            
+            // 调用扩展方法
+            List<Chapter> expandedChapters = chapterService.expandChapters(
+                    projectId, existingIds, targetCount);
+            return Result.success("章节扩展成功", expandedChapters);
+        } catch (Exception e) {
+            log.error("章节扩展失败: {}", e.getMessage(), e);
+            return Result.error("章节扩展失败: " + e.getMessage());
+        }
+    }
+
+    /**
      * 生成章节内容
      *
      * @param chapterId           章节ID

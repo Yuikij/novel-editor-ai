@@ -31,7 +31,7 @@ spring:
       chat:
         options:
           # ??ID,???????????ID
-          model: doubao-1-5-pro-32k-character-250228
+          model: doubao-1-5-lite-32k-250115
         # Chat????,?OpenAI??????
         completions-path: /v3/chat/completions
 logging:
