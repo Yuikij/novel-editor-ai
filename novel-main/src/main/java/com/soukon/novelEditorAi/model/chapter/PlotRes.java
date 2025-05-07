@@ -21,8 +21,8 @@ public class PlotRes {
         return "情节：{" +
                "\n\t标题: '" + title + '\'' +
                ",\n\t描述: '" + description + '\'' +
-               ",\n\tsortOrder: " + sortOrder +
-               ",\n\tstatus: '" + status + '\'' +
+               ",\n\t顺序: " + sortOrder +
+               ",\n\t完成状态: '" + status + '\'' +
                ",\n\t完成百分比: " + completionPercentage + "%" +
                ",\n\t目标字数: " + wordCountGoal +
                "\n}";
