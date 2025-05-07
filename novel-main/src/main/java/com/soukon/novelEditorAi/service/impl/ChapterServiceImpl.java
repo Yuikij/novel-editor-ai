@@ -5,10 +5,10 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.soukon.novelEditorAi.entities.Chapter;
+import com.soukon.novelEditorAi.entities.OutlinePlotPoint;
 import com.soukon.novelEditorAi.entities.Project;
 import com.soukon.novelEditorAi.mapper.ChapterMapper;
-import com.soukon.novelEditorAi.service.ChapterService;
-import com.soukon.novelEditorAi.service.ProjectService;
+import com.soukon.novelEditorAi.service.*;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
@@ -18,6 +18,7 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 
@@ -33,16 +34,22 @@ public class ChapterServiceImpl extends ServiceImpl<ChapterMapper, Chapter> impl
 
 
     private final ChapterMapper chapterMapper;
-
-
     private final ProjectService projectService;
-
     private final ChatClient chatClient;
+    private final CharacterService characterService;
+    private final CharacterRelationshipService characterRelationshipService;
+    private final OutlinePlotPointService outlinePlotPointService;
 
     @Autowired
-    public ChapterServiceImpl(ChapterMapper chapterMapper, ProjectService projectService,ChatModel openAiChatModel) {
+    public ChapterServiceImpl(ChapterMapper chapterMapper, ProjectService projectService,ChatModel openAiChatModel,
+                              CharacterService characterService,CharacterRelationshipService characterRelationshipService,
+                              @Lazy OutlinePlotPointService outlinePlotPointService
+    ) {
         this.chapterMapper = chapterMapper;
         this.projectService = projectService;
+        this.characterService = characterService;
+        this.outlinePlotPointService = outlinePlotPointService;
+        this.characterRelationshipService = characterRelationshipService;
         this.chatClient = ChatClient.builder(openAiChatModel)
                 .defaultAdvisors(new SimpleLoggerAdvisor())
                 .defaultOptions(
@@ -300,6 +307,44 @@ public class ChapterServiceImpl extends ServiceImpl<ChapterMapper, Chapter> impl
     }
 
     /**
+     * 构建小说上下文信息
+     * 
+     * @param projectId 项目ID
+     * @return 包含小说相关信息的Map
+     */
+    private Map<String, Object> buildNovelContext(Long projectId) {
+        Map<String, Object> context = new HashMap<>();
+        
+        try {
+            // 获取项目信息
+            Project project = projectService.getById(projectId);
+            if (project == null) {
+                throw new IllegalArgumentException("找不到指定的项目: " + projectId);
+            }
+            // 添加项目基本信息
+            context.put("项目基本信息", projectService.toPrompt(project));
+
+            // 获取大纲
+            context.put("大纲信息", outlinePlotPointService.toPrompt(projectId));
+
+            // 获取角色信息
+            context.put("主要角色", characterService.toPrompt(projectId));
+
+            // 获取角色关系
+            context.put("角色关系", characterRelationshipService.toPrompt(projectId));
+
+            // 获取章节信息
+            context.put("章节信息", toPromptProjectId(projectId));
+
+
+        } catch (Exception e) {
+            log.error("构建小说上下文失败: {}", e.getMessage(), e);
+        }
+        
+        return context;
+    }
+
+    /**
      * 从JSON字符串解析章节列表
      *
      * @param json JSON格式的章节列表字符串
@@ -336,32 +381,5 @@ public class ChapterServiceImpl extends ServiceImpl<ChapterMapper, Chapter> impl
         return input;
     }
 
-    /**
-     * 构建小说上下文信息
-     *
-     * @param projectId 项目ID
-     * @return 包含小说相关信息的Map
-     */
-    private Map<String, Object> buildNovelContext(Long projectId) {
-        Map<String, Object> context = new HashMap<>();
 
-        try {
-            // 获取项目信息
-            Project project = projectService.getById(projectId);
-            if (project != null) {
-                context.put("小说标题", project.getTitle());
-                context.put("小说简介", project.getSynopsis());
-                context.put("小说风格", project.getStyle());
-                // 注释掉暂不支持的字段
-                // context.put("写作目标", project.getGoal());
-            }
-
-            // 可以添加更多项目相关信息，如世界观、角色等
-
-        } catch (Exception e) {
-            log.error("构建小说上下文失败: {}", e.getMessage(), e);
-        }
-
-        return context;
-    }
 } 

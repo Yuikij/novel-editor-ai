@@ -1,6 +1,7 @@
 package com.soukon.novelEditorAi.service.impl;
 
 import com.soukon.novelEditorAi.entities.Chapter;
+import com.soukon.novelEditorAi.entities.Project;
 import com.soukon.novelEditorAi.model.chapter.ChapterContentRequest;
 import com.soukon.novelEditorAi.model.chapter.ChapterContext;
 import com.soukon.novelEditorAi.model.chapter.ReasoningRes;
@@ -12,10 +13,13 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.ai.document.Document;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 提示词服务实现类，负责生成与AI交互的提示词
@@ -37,7 +41,7 @@ public class PromptServiceImpl implements PromptService {
     private Integer ragMaxResults;
 
     public PromptServiceImpl(ProjectService projectService,
-                          ChapterService chapterService,
+                          @Lazy ChapterService chapterService,
                           WorldService worldService,
                           CharacterService characterService,
                           PlotService plotService,
@@ -83,11 +87,11 @@ public class PromptServiceImpl implements PromptService {
                 2. 确定本章节在整体故事中的作用和目标，设计合理的章节结构
                 3. 在输出情节列表时:
                     - 更新当前情节的完成情况和百分比，根据写作计划自由确定（例如100表示完成，低于100表示部分完成）。
-                    - 若有新增情节，提供清晰的标题和描述，状态为“进行中”或“已完成”，并自由确定完成百分比。
+                    - 若有新增情节，提供清晰的标题和描述，状态为"进行中"或"已完成"，并自由确定完成百分比。
                     - 确保只有一个情节的完成百分比非100，以支持后续续写。新增情节标题不能与当前已有情节相同。
                     - 每个情节的完成百分比需与写作计划中的字数分配和内容进展一致。例如，若当前情节分配3000字且全部完成，则将当前情节的完成百分比字段设为100；若新增情节分配2000字且部分完成，设为50-80。
                 4. 更新当前情节及其他情节的`completionPercentage`和`status`，根据写作计划的字数分配和内容进展确定。
-                5. 新增情节需提供清晰的标题和描述，状态为“进行中”或“已完成”。
+                5. 新增情节需提供清晰的标题和描述，状态为"进行中"或"已完成"。
                 
                 章节内容要求：
                 1. 内容必须符合小说风格、主题和设定
@@ -289,6 +293,43 @@ public class PromptServiceImpl implements PromptService {
         log.info("[Acting] 最终执行提示词(System):\n{}", systemPrompt);
         log.info("[Acting] 最终执行提示词(User):\n{}", userPromptBuilder.toString());
         return messages;
+    }
+
+    /**
+     * 构建小说上下文信息
+     * 
+     * @param projectId 项目ID
+     * @return 包含小说相关信息的Map
+     */
+    private Map<String, Object> buildNovelContext(Long projectId) {
+        Map<String, Object> context = new HashMap<>();
+
+        try {
+            // 获取项目信息
+            Project project = projectService.getById(projectId);
+            if (project == null) {
+                throw new IllegalArgumentException("找不到指定的项目: " + projectId);
+            }
+            // 添加项目基本信息
+            context.put("项目基本信息", projectService.toPrompt(project));
+
+            // 获取大纲
+            context.put("大纲信息", outlinePlotPointService.toPrompt(projectId));
+
+            // 获取角色信息
+            context.put("主要角色", characterService.toPrompt(projectId));
+
+            // 获取角色关系
+            context.put("角色关系", characterRelationshipService.toPrompt(projectId));
+
+            // 获取章节信息
+            context.put("章节信息", chapterService.toPromptProjectId(projectId));
+
+        } catch (Exception e) {
+            log.error("构建小说上下文失败: {}", e.getMessage(), e);
+        }
+
+        return context;
     }
 
     /**

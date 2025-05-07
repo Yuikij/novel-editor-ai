@@ -20,6 +20,15 @@ public interface OutlinePlotPointService extends IService<OutlinePlotPoint> {
 
 
     /**
+     * 生成用于构建生成请求 Prompt 的大纲情节点信息。
+     *
+     * @param projectId 项目ID
+     * @return 包含情节点描述的字符串。
+     */
+    String toPrompt(Long projectId);
+
+
+    /**
      * 根据已有的大纲情节点，补全或扩展情节点列表
      *
      * @param projectId 项目ID

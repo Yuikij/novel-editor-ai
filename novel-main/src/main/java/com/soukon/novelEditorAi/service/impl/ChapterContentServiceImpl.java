@@ -37,6 +37,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Flux;
+import org.springframework.context.annotation.Lazy;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -86,7 +87,7 @@ public class ChapterContentServiceImpl implements ChapterContentService {
                                      CharacterMapper characterMapper,
                                      PlotMapper plotMapper,
                                      RagService ragService,
-                                     PromptService promptService,
+                                     @Lazy PromptService promptService,
                                      ProjectService projectService,
                                      ChapterService chapterService,
                                      WorldService worldService,

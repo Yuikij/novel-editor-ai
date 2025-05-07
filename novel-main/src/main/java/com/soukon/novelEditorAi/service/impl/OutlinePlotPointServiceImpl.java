@@ -26,6 +26,7 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 
@@ -53,7 +54,7 @@ public class OutlinePlotPointServiceImpl extends ServiceImpl<OutlinePlotPointMap
                                       WorldService worldService,
                                       CharacterService characterService,
                                       CharacterRelationshipService characterRelationshipService,
-                                      ChapterService chapterService) {
+                                      @Lazy ChapterService chapterService) {
         this.openAiChatModel = openAiChatModel;
         this.objectMapper = objectMapper;
         this.projectService = projectService;
@@ -87,9 +88,25 @@ public class OutlinePlotPointServiceImpl extends ServiceImpl<OutlinePlotPointMap
         return sb.toString();
     }
 
+    @Override
+    public String toPrompt(Long projectId) {
+        LambdaQueryWrapper<OutlinePlotPoint> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(OutlinePlotPoint::getProjectId, projectId);
+        queryWrapper.orderByAsc(OutlinePlotPoint::getSortOrder);
+        List<OutlinePlotPoint> outlinePlotPoints = list(queryWrapper);
+        StringBuilder chaptersInfo = new StringBuilder();
+        if (outlinePlotPoints != null && !outlinePlotPoints.isEmpty()) {
+            chaptersInfo.append("大纲 ").append(":\n");
+            for (OutlinePlotPoint  outlinePlotPoint: outlinePlotPoints) {
+                // 使用直接查库的toPrompt方法，自动获取上一章节摘要
+                chaptersInfo.append(toPrompt(outlinePlotPoint));
+                chaptersInfo.append("-----\n");
+            }
+        }
+        return chaptersInfo.toString();
+    }
 
 
-    
     /**
      * 构建小说上下文信息
      * 

@@ -34,6 +34,8 @@ spring:
           model: doubao-1-5-lite-32k-250115
         # Chat????,?OpenAI??????
         completions-path: /v3/chat/completions
+  main:
+    allow-circular-references: true
 logging:
   level:
     com.soukon.novelEditorAi.mapper: debug
