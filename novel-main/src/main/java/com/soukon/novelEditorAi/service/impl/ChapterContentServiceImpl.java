@@ -6,6 +6,7 @@ import com.soukon.novelEditorAi.entities.Character;
 import com.soukon.novelEditorAi.entities.Plot;
 import com.soukon.novelEditorAi.entities.World;
 import com.soukon.novelEditorAi.entities.CharacterRelationship;
+import com.soukon.novelEditorAi.llm.LlmService;
 import com.soukon.novelEditorAi.mapper.ChapterMapper;
 import com.soukon.novelEditorAi.mapper.CharacterMapper;
 import com.soukon.novelEditorAi.mapper.PlotMapper;
@@ -72,6 +73,10 @@ public class ChapterContentServiceImpl implements ChapterContentService {
     private final PlotService plotService;
     private final CharacterRelationshipService characterRelationshipService;
     private final OutlinePlotPointService outlinePlotPointService;
+
+
+    @Autowired
+    private LlmService llmService;
 
     @Value("${novel.chapter.default-max-tokens:2000}")
     private Integer defaultMaxTokens;
@@ -164,7 +169,8 @@ public class ChapterContentServiceImpl implements ChapterContentService {
         try {
             BeanOutputConverter<ReasoningRes> converter = new BeanOutputConverter<>(ReasoningRes.class);
             log.info("[Reasoning] 正在分析章节要求并制定写作计划");
-            reasoningResult = chatClient.prompt(new Prompt(reasoningMessages)).call().content();
+            reasoningResult = llmService.getAgentChatClient(request.getChapterId() + "").getChatClient().prompt(new Prompt(reasoningMessages)).call().content();
+//            reasoningResult = chatClient.prompt(new Prompt(reasoningMessages)).call().content();
             reasoningRes = reasoningResult == null ? null : converter.convert(reasoningResult);
             log.info("[Reasoning] 完成章节分析和写作计划，长度: {}", reasoningResult.length());
         } catch (Exception e) {
@@ -175,23 +181,23 @@ public class ChapterContentServiceImpl implements ChapterContentService {
         // 将reasoningRes保存到数据库
         if (reasoningRes != null && reasoningRes.getPlotList() != null && !reasoningRes.getPlotList().isEmpty()) {
             log.info("[Reasoning] 保存章节情节数据，情节数量: {}", reasoningRes.getPlotList().size());
-            
+
             // 获取章节ID
             Long chapterId = request.getChapterId();
-            
+
             // 获取项目ID
             Long projectId = context.getProjectId();
-            
+
             // 先删除原有的章节情节数据，避免重复
             plotMapper.delete(
-                Wrappers.<Plot>lambdaQuery()
-                    .eq(Plot::getChapterId, chapterId)
+                    Wrappers.<Plot>lambdaQuery()
+                            .eq(Plot::getChapterId, chapterId)
             );
-            
+
             // 遍历情节列表并保存
             for (int i = 0; i < reasoningRes.getPlotList().size(); i++) {
                 PlotRes plotRes = reasoningRes.getPlotList().get(i);
-                
+
                 // 创建新的Plot实体
                 Plot plot = new Plot();
                 plot.setProjectId(projectId);
@@ -202,16 +208,16 @@ public class ChapterContentServiceImpl implements ChapterContentService {
                 plot.setStatus(plotRes.getStatus());
                 plot.setCompletionPercentage(plotRes.getCompletionPercentage());
                 plot.setWordCountGoal(plotRes.getWordCountGoal());
-                
+
                 // 设置创建和更新时间
                 LocalDateTime now = LocalDateTime.now();
                 plot.setCreatedAt(now);
                 plot.setUpdatedAt(now);
-                
+
                 // 保存情节
                 plotMapper.insert(plot);
             }
-            
+
             log.info("[Reasoning] 成功保存章节情节数据");
         } else {
             log.warn("[Reasoning] 章节情节数据为空，不保存");
@@ -481,7 +487,9 @@ public class ChapterContentServiceImpl implements ChapterContentService {
         try {
             BeanOutputConverter<ReasoningRes> converter = new BeanOutputConverter<>(ReasoningRes.class);
             log.info("[Reasoning] 正在分析章节要求并制定写作计划");
-            reasoningResult = chatClient.prompt(new Prompt(reasoningMessages)).call().content();
+
+            reasoningResult = llmService.getAgentChatClient(request.getChapterId() + "").getChatClient()
+                    .prompt(new Prompt(reasoningMessages)).call().content();
             reasoningRes = reasoningResult == null ? null : converter.convert(reasoningResult);
             log.info("[Reasoning] 完成章节分析和写作计划，长度: {}", reasoningResult.length());
         } catch (Exception e) {
@@ -544,7 +552,8 @@ public class ChapterContentServiceImpl implements ChapterContentService {
 
         // 调用AI模型生成实际章节内容
         log.info("[Acting] 正在以流式方式生成章节内容");
-        Flux<String> contentFlux = chatClient.prompt(new Prompt(actingMessages)).stream().content();
+        Flux<String> contentFlux = llmService.getAgentChatClient(request.getChapterId() + "").getChatClient()
+                .prompt(new Prompt(actingMessages)).stream().content();
 
         // 计算生成耗时
         long endTime = System.currentTimeMillis();

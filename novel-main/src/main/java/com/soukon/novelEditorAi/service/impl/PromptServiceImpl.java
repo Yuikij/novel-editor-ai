@@ -73,13 +73,12 @@ public class PromptServiceImpl implements PromptService {
 
         // 系统提示词 - 引导AI进行推理分析
         String systemPrompt = """
-                你是一位专业的小说写作专家，擅长根据提供的上下文、要求规划小说章节的具体情节。
+                你是一位专业的小说写作专家，擅长根据提供的上下文、在指定的章节中，按照要求评估已有情节的完成情况和规划后续情节。
               
-                请根据提供的章节上下文信息，规划符合要求的情节列表并且补全已有情节的完成情况：
-                
                 目标：
                 1. 评估已有情节的完成情况：
-                根据当前章节的内容和已有情节的描述和目标字数，评估已有情节的完成情况，若已有内容完整实现了情节描述的核心事件（如主要场景或互动），将completionPercentage设为100，status设为“已完成”；否则，根据内容进展估算百分比并设为“进行中”。
+                根据当前章节的内容和已有情节的描述和目标字数，评估已有情节的完成情况，若已有内容完整实现了情节描述的核心事件（如主要场景或互动），
+                将completionPercentage设为100，status设为“已完成”；否则，根据内容进展估算百分比并设为“进行中”；如果当前章节没有内容，则。
                 2. 规划符合要求的情节列表
                 根据写作要求的目标输出字数（优先级最高，不包含已有的内容），参考章节目标字数，章节位置和等信息，合理规划执行完成目标写作字数的情节列表，续写的情节的completionPercentage一定是0，status一定是“进行中”，因为没有正式写内容
                 
@@ -184,6 +183,9 @@ public class PromptServiceImpl implements PromptService {
             userPromptBuilder.append("### 本章节需要包含的情节\n");
             context.getChapterPlots().forEach(plot -> userPromptBuilder.append(plotService.toPrompt(plot)));
             userPromptBuilder.append("\n");
+        }else{
+
+            userPromptBuilder.append("已有情节为空\n");
         }
 
         // 已有内容
@@ -196,6 +198,8 @@ public class PromptServiceImpl implements PromptService {
                 userPromptBuilder.append("(已截取最后部分内容)\n");
             }
             userPromptBuilder.append(content).append("\n\n");
+        }else{
+            userPromptBuilder.append("已有内容为空\n");
         }
 
         // 相关背景信息 (RAG)
@@ -235,83 +239,11 @@ public class PromptServiceImpl implements PromptService {
 
         // 用户提示词 - 包含上下文信息和推理结果
         StringBuilder userPromptBuilder = new StringBuilder();
-        userPromptBuilder.append("请根据以下章节上下文和写作计划，创作本章节内容：\n\n");
-
-        // 第一部分：小说元数据
-        userPromptBuilder.append("## 1. 小说元数据\n");
-
-        // 项目信息
-        if (context.getProject() != null) {
-            userPromptBuilder.append(projectService.toPrompt(context.getProject())).append("\n");
-        }
-
-        // 世界观信息
-        if (context.getWorld() != null) {
-            userPromptBuilder.append("### 世界观信息\n");
-            userPromptBuilder.append(worldService.toPrompt(context.getWorld())).append("\n");
-        }
-
-        // 角色信息
-        if (context.getCharacters() != null && !context.getCharacters().isEmpty()) {
-            userPromptBuilder.append("### 主要角色\n");
-            context.getCharacters().forEach(character -> userPromptBuilder.append(characterService.toPrompt(character)));
-            userPromptBuilder.append("\n");
-        }
-
-        // 角色关系信息
-        if (context.getCharacterRelationships() != null && !context.getCharacterRelationships().isEmpty()) {
-            userPromptBuilder.append("### 角色关系\n");
-            context.getCharacterRelationships().forEach(rel -> userPromptBuilder.append(characterRelationshipService.toPrompt(rel)));
-            userPromptBuilder.append("\n");
-        }
-
-        // 大纲情节点信息
-        if (context.getPlotPoints() != null && !context.getPlotPoints().isEmpty()) {
-            userPromptBuilder.append("### 小说整体大纲\n");
-            context.getPlotPoints().forEach(point -> userPromptBuilder.append(outlinePlotPointService.toPrompt(point)));
-            userPromptBuilder.append("\n");
-        }
-
-        // 第二部分：写作目标
-        userPromptBuilder.append("## 2. 写作目标\n");
-
-        // 添加写作目标的具体要求
-        Chapter currentChapter = context.getCurrentChapter();
-        if (currentChapter != null) {
-            userPromptBuilder.append("### 写作要求\n");
-            userPromptBuilder.append("- 目标字数：").append(request.getWordCountSuggestion()).append("字（必须严格遵守，优先级高于章节目标字数或其他字数要求）\n");
-            if (currentChapter.getContent() != null && !currentChapter.getContent().isEmpty()) {
-                userPromptBuilder.append("- 类型：续写\n");
-            } else {
-                userPromptBuilder.append("- 类型：创作\n");
-            }
-            userPromptBuilder.append("- 写作建议：").append(request.getPromptSuggestion()).append("\n");
-
-            userPromptBuilder.append("\n");
-        }
-
-        // 第三部分：当前写作进度和章节信息
-        userPromptBuilder.append("## 3. 当前写作进度和章节信息\n");
-
-        // 章节信息
-        String previousChapterSummary = context.getPreviousChapter() != null ? context.getPreviousChapter().getSummary() : null;
-        if (currentChapter != null) {
-            userPromptBuilder.append(chapterService.toPrompt(currentChapter, previousChapterSummary));
-            userPromptBuilder.append("\n");
-        }
-
-        // 相关背景信息 (RAG)
-        String relevantInfo = retrieveRelevantInfo(context.getCurrentChapter().getId());
-        if (relevantInfo != null && !relevantInfo.isEmpty()) {
-            userPromptBuilder.append("### 相关背景信息\n").append(relevantInfo).append("\n");
-        }
 
         // 添加写作计划（推理结果）
         userPromptBuilder.append("## 目前章节的情节列表\n");
         userPromptBuilder.append(reasoningResult);
         userPromptBuilder.append("\n\n");
-
-
 
         // 现有内容（续写）
         String existingContent = context.getCurrentChapter() != null ? context.getCurrentChapter().getContent() : null;
