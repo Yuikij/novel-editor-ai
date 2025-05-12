@@ -7,12 +7,14 @@ import com.soukon.novelEditorAi.entities.Plot;
 import com.soukon.novelEditorAi.service.PlotService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
 @RequestMapping("/plots")
+@Slf4j
 public class PlotController {
 
     @Autowired
@@ -130,5 +132,73 @@ public class PlotController {
         
         plotService.removeById(id);
         return Result.success("Plot deleted successfully", null);
+    }
+    
+    /**
+     * 批量删除情节
+     *
+     * @param ids 情节ID列表
+     * @return 删除结果
+     */
+    @DeleteMapping("/batch")
+    public Result<Void> batchDelete(@RequestBody List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return Result.error("IDs list cannot be empty");
+        }
+        
+        plotService.removeByIds(ids);
+        return Result.success("批量删除成功", null);
+    }
+    
+    /**
+     * 获取章节中第一个未完成的情节
+     * 
+     * @param chapterId 章节ID
+     * @return 第一个未完成的情节，如果所有情节都已完成或没有情节则返回null
+     */
+    @GetMapping("/first-incomplete/{chapterId}")
+    public Result<Plot> getFirstIncompletePlot(@PathVariable("chapterId") Long chapterId) {
+        if (chapterId == null) {
+            return Result.error("Chapter ID is required");
+        }
+        
+        Plot plot = plotService.getFirstIncompletePlot(chapterId);
+        if (plot != null) {
+            return Result.success(plot);
+        } else {
+            return Result.success("All plots are complete or no plots exist", null);
+        }
+    }
+    
+    /**
+     * 自动补全或扩展情节列表到目标数量
+     * 
+     * @param chapterId 章节ID
+     * @param targetCount 目标情节总数
+     * @return 补全后的情节列表
+     */
+    @PostMapping("/auto-expand/{chapterId}")
+    public Result<List<Plot>> autoExpandPlots(
+            @PathVariable("chapterId") Long chapterId,
+            @RequestParam(value = "targetCount", required = false, defaultValue = "5") Integer targetCount) {
+        log.info("自动扩展情节，章节ID: {}, 目标数量: {}", chapterId, targetCount);
+        try {
+            // 获取章节所有现有情节ID
+            LambdaQueryWrapper<Plot> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(Plot::getChapterId, chapterId);
+            queryWrapper.select(Plot::getId);
+            List<Long> existingIds = this.plotService.list(queryWrapper)
+                    .stream()
+                    .map(Plot::getId)
+                    .toList();
+            
+            // 调用扩展方法
+            List<Plot> expandedPlots = plotService.expandPlots(
+                    chapterId, existingIds, targetCount);
+            return Result.success("情节扩展成功", expandedPlots);
+        } catch (Exception e) {
+            log.error("情节扩展失败: {}", e.getMessage(), e);
+            return Result.error("情节扩展失败: " + e.getMessage());
+        }
     }
 }

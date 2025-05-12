@@ -139,4 +139,32 @@ public class CharacterController {
         characterService.removeById(id);
         return Result.success("Character deleted successfully", null);
     }
+    
+    /**
+     * 使用LLM生成完整的角色信息
+     * 
+     * @param character 部分填写的角色信息，至少需要指定项目ID
+     * @return 生成并保存后的完整角色信息
+     */
+    @PostMapping("/generate")
+    public Result<Character> generateCharacter(@RequestBody Character character) {
+        try {
+            if (character == null || character.getProjectId() == null) {
+                return Result.error("项目ID是必须的");
+            }
+            
+            // 生成角色
+            Character generatedCharacter = characterService.generateCharacter(character);
+            
+            // 保存到数据库
+            LocalDateTime now = LocalDateTime.now();
+            generatedCharacter.setCreatedAt(now);
+            generatedCharacter.setUpdatedAt(now);
+            characterService.save(generatedCharacter);
+            
+            return Result.success("角色生成成功", generatedCharacter);
+        } catch (Exception e) {
+            return Result.error("角色生成失败: " + e.getMessage());
+        }
+    }
 } 

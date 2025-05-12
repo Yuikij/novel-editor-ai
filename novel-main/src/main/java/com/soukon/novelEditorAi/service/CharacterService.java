@@ -22,4 +22,12 @@ public interface CharacterService extends IService<Character> {
      * @return 包含所有角色姓名和描述的字符串。
      */
      String toPrompt(Long projectId);
+     
+    /**
+     * 使用LLM生成角色信息
+     *
+     * @param partialCharacter 部分填写的角色信息，至少需要指定项目ID
+     * @return 完整的角色信息
+     */
+    Character generateCharacter(Character partialCharacter);
 } 
