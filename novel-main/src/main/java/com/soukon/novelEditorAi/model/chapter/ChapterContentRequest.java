@@ -15,7 +15,9 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ChapterContentRequest {
-    
+
+    private PlanContext planContext;
+
     /**
      * 章节ID
      */

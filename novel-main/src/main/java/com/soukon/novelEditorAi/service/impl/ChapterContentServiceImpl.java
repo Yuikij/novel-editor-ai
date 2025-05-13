@@ -372,24 +372,17 @@ public class ChapterContentServiceImpl implements ChapterContentService {
         // 创建新的计划上下文
         PlanContext planContext = new PlanContext(planId);
         planContext.setPlanState(PlanState.PLANNING);
-        planContext.setPlanStreams(new HashMap<>());
         planContextMap.put(planId, planContext);
-        
+        request.setPlanContext(planContext);
+
         // 异步执行任务
-        CompletableFuture.supplyAsync(() -> {
+        CompletableFuture.runAsync(() -> {
             try {
                 planContext.setPlanState(PlanState.IN_PROGRESS);
-                
                 // 生成内容
-                Flux<String> contentFlux = generateChapterContentStreamFlux(request);
-                
-                // 将内容流存入计划上下文
-                planContext.getPlanStreams().put(1, contentFlux);
-                
+                generateChapterContentStreamFlux(request);
                 // 更新计划状态
                 planContext.setPlanState(PlanState.COMPLETED);
-                
-                return contentFlux;
             }
             catch (Exception e) {
                 log.error("执行计划失败", e);
@@ -397,7 +390,6 @@ public class ChapterContentServiceImpl implements ChapterContentService {
                 throw new RuntimeException("执行计划失败: " + e.getMessage(), e);
             }
         });
-
         return Result.success("执行成功", planId);
     }
 
@@ -495,7 +487,7 @@ public class ChapterContentServiceImpl implements ChapterContentService {
     }
 
     @Override
-    public Flux<String> generateChapterContentStreamFlux(ChapterContentRequest request) {
+    public void generateChapterContentStreamFlux(ChapterContentRequest request) {
 
         String planId = UuidUtils.generateUuid();
         planContextMap.put(planId, new PlanContext(planId));
@@ -558,37 +550,14 @@ public class ChapterContentServiceImpl implements ChapterContentService {
         
         // 使用WritingAgent执行写作计划
         log.info("[Acting] 使用ReAct方式生成章节内容，计划步骤数: {}", planList.size());
-        WritingAgent writingAgent = new WritingAgent(this.llmService);
+        WritingAgent writingAgent = new WritingAgent(this.llmService,  request);
         writingAgent.setPlanId(planId);
         
         // 使用Flux合并所有步骤的内容
-        List<Flux<String>> stepFluxes = new ArrayList<>();
         for (String planStep : planList) {
             log.info("[Acting] 执行写作计划步骤: {}", planStep);
-            Flux<String> stepFlux = writingAgent.run(planStep, planId, request);
-            stepFluxes.add(stepFlux);
+            writingAgent.run(planStep);
         }
-        
-        // 合并所有步骤的Flux
-        Flux<String> contentFlux = null;
-        for (Flux<String> stepFlux : stepFluxes) {
-            if (contentFlux == null) {
-                contentFlux = stepFlux;
-            } else {
-                contentFlux = contentFlux.concatWith(stepFlux);
-            }
-        }
-        
-        // 如果没有内容，返回空的Flux
-        if (contentFlux == null) {
-            contentFlux = Flux.empty();
-        }
-        
-        // 计算生成耗时
-        long endTime = System.currentTimeMillis();
-        long duration = endTime - startTime;
-        log.info("[Acting] 章节内容生成总耗时: {}ms", duration);
 
-        return contentFlux;
     }
 } 

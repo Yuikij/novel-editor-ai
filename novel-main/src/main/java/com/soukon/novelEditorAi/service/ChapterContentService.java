@@ -30,7 +30,7 @@ public interface ChapterContentService {
     /**
      * 新增：流式生成章节内容，返回Flux<String>
      */
-    Flux<String> generateChapterContentStreamFlux(ChapterContentRequest request);
+    void generateChapterContentStreamFlux(ChapterContentRequest request);
     
     /**
      * 保存生成的章节内容

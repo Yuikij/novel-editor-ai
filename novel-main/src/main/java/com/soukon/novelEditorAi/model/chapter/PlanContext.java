@@ -10,7 +10,7 @@ import java.util.HashMap;
 public class PlanContext {
     private PlanState planState;
     private String planId;
-    private HashMap<Integer,Flux<String>> planStreams;
+    private Flux<String> planStream;
 
     public PlanContext(String planId) {
         this.planId = planId;

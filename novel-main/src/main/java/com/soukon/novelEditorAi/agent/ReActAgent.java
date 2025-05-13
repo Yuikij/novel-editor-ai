@@ -16,6 +16,7 @@
 package com.soukon.novelEditorAi.agent;
 
 import com.soukon.novelEditorAi.llm.LlmService;
+import com.soukon.novelEditorAi.model.chapter.ChapterContentRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,8 +33,8 @@ public abstract class ReActAgent extends BaseAgent {
 	 * @param planExecutionRecorder 计划执行记录器，用于记录执行过程
 	 * @param manusProperties Manus配置属性
 	 */
-	public ReActAgent(LlmService llmService) {
-		super(llmService);
+	public ReActAgent(LlmService llmService, ChapterContentRequest request) {
+		super(llmService,request);
 	}
 
 	/**

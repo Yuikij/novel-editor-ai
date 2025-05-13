@@ -17,6 +17,7 @@ package com.soukon.novelEditorAi.agent;
 
 import com.soukon.novelEditorAi.llm.LlmService;
 import com.soukon.novelEditorAi.model.chapter.ChapterContentRequest;
+import com.soukon.novelEditorAi.model.chapter.PlanContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.messages.AssistantMessage.ToolCall;
@@ -47,6 +48,9 @@ import static org.springframework.ai.chat.client.advisor.AbstractChatMemoryAdvis
 import static org.springframework.ai.chat.client.advisor.AbstractChatMemoryAdvisor.CHAT_MEMORY_RETRIEVE_SIZE_KEY;
 
 public class WritingAgent extends ReActAgent {
+
+
+
 
     private static final Logger log = LoggerFactory.getLogger(WritingAgent.class);
 
@@ -123,28 +127,25 @@ public class WritingAgent extends ReActAgent {
     private ChapterContentRequest request;
     private Map<String, Object> stepData = new HashMap<>();
 
-    public WritingAgent() {
-        super(null);
-    }
     
-    public WritingAgent(LlmService llmService) {
-        super(llmService);
+    public WritingAgent(LlmService llmService, ChapterContentRequest request) {
+        super(llmService, request);
     }
 
     public Flux<String> run(String planStep, String planId, ChapterContentRequest request) {
         this.planId = planId;
         this.request = request;
         this.planSteps.add(planStep);
-        
+
         // 从请求中获取目标字数，如果有的话
         if (request.getWordCountSuggestion() != null) {
             this.targetWordCount = request.getWordCountSuggestion();
         }
-        
+
         // 创建一个Flux用于返回生成的内容
         List<String> contentPieces = new ArrayList<>();
         AtomicInteger stepCounter = new AtomicInteger(1);
-        
+
         // 执行所有步骤，直到满足终止条件
         while (currentStepNumber <= planSteps.size() && currentWordCount < targetWordCount) {
             AgentExecResult result = executeWritingStep(currentStepNumber);
@@ -153,13 +154,13 @@ public class WritingAgent extends ReActAgent {
                 log.info("已完成第{}步写作，当前总字数: {}", currentStepNumber, currentWordCount);
                 currentStepNumber++;
             }
-            
+
             if (result.getState() == AgentState.COMPLETED) {
                 log.info("写作完成: {}", result.getResult());
                 break;
             }
         }
-        
+
         return Flux.fromIterable(contentPieces);
     }
     
@@ -224,13 +225,14 @@ public class WritingAgent extends ReActAgent {
         
         // 调用LLM生成行动结果
         Prompt prompt = new Prompt(List.of(actionMessage));
-        String result = llmService.getAgentChatClient(planId)
+        Flux<String> result = llmService.getAgentChatClient(planId)
                 .getChatClient()
                 .prompt(prompt)
-                .call()
-                .content();
-                
-        return result;
+                .stream().content();
+
+        PlanContext planContext = chapterContentRequest.getPlanContext();
+        planContext.setPlanStream(result);
+        return "";
     }
     
     private String getLastParagraph(String text) {
@@ -253,7 +255,7 @@ public class WritingAgent extends ReActAgent {
 
     @Override
     protected boolean think() {
-        // 这个方法由父类ReActAgent调用，但我们使用自己的执行流程
+
         return false;
     }
 

@@ -60,12 +60,7 @@ public class ChapterController {
     }
 
     @GetMapping("/page")
-    public Result<Page<Chapter>> page(
-            @RequestParam(value = "page", defaultValue = "1", name = "page") Integer page,
-            @RequestParam(value = "pageSize", defaultValue = "10", name = "pageSize") Integer pageSize,
-            @RequestParam(value = "projectId", required = false, name = "projectId") Long projectId,
-            @RequestParam(value = "title", required = false, name = "title") String title,
-            @RequestParam(value = "status", required = false, name = "status") String status) {
+    public Result<Page<Chapter>> page(@RequestParam(value = "page", defaultValue = "1", name = "page") Integer page, @RequestParam(value = "pageSize", defaultValue = "10", name = "pageSize") Integer pageSize, @RequestParam(value = "projectId", required = false, name = "projectId") Long projectId, @RequestParam(value = "title", required = false, name = "title") String title, @RequestParam(value = "status", required = false, name = "status") String status) {
 
         Page<Chapter> pageInfo = new Page<>(page, pageSize);
         LambdaQueryWrapper<Chapter> queryWrapper = new LambdaQueryWrapper<>();
@@ -170,23 +165,17 @@ public class ChapterController {
      * @return 补全后的章节列表
      */
     @PostMapping("/auto-expand/{projectId}")
-    public Result<List<Chapter>> autoExpandChapters(
-            @PathVariable("projectId") Long projectId,
-            @RequestParam(value = "targetCount", required = false, defaultValue = "12") Integer targetCount) {
+    public Result<List<Chapter>> autoExpandChapters(@PathVariable("projectId") Long projectId, @RequestParam(value = "targetCount", required = false, defaultValue = "12") Integer targetCount) {
         log.info("自动扩展章节，项目ID: {}, 目标数量: {}", projectId, targetCount);
         try {
             // 获取项目所有现有章节ID
             LambdaQueryWrapper<Chapter> queryWrapper = new LambdaQueryWrapper<>();
             queryWrapper.eq(Chapter::getProjectId, projectId);
             queryWrapper.select(Chapter::getId);
-            List<Long> existingIds = this.chapterService.list(queryWrapper)
-                    .stream()
-                    .map(Chapter::getId)
-                    .toList();
+            List<Long> existingIds = this.chapterService.list(queryWrapper).stream().map(Chapter::getId).toList();
 
             // 调用扩展方法
-            List<Chapter> expandedChapters = chapterService.expandChapters(
-                    projectId, existingIds, targetCount);
+            List<Chapter> expandedChapters = chapterService.expandChapters(projectId, existingIds, targetCount);
             return Result.success("章节扩展成功", expandedChapters);
         } catch (Exception e) {
             log.error("章节扩展失败: {}", e.getMessage(), e);
@@ -208,17 +197,8 @@ public class ChapterController {
      * @return 生成的章节内容
      */
     @GetMapping("/generate")
-    public Result<ChapterContentResponse> generateChapterContent(
-            @RequestParam("chapterId") Long chapterId,
-            @RequestParam("projectId") Long projectId,
-            @RequestParam(value = "regenerate", required = false, defaultValue = "false") Boolean regenerate,
-            @RequestParam(value = "minWords", required = false, defaultValue = "500") Integer minWords,
-            @RequestParam(value = "stylePrompt", required = false) String stylePrompt,
-            @RequestParam(value = "appendMode", required = false, defaultValue = "true") Boolean appendMode,
-            @RequestParam(value = "promptSuggestion", required = false) String promptSuggestion,
-            @RequestParam(value = "wordCountSuggestion", required = false) Integer wordCountSuggestion) {
-        log.info("生成章节内容，章节ID: {}, 项目ID: {}, 重新生成: {}, 追加模式: {}",
-                chapterId, projectId, regenerate, appendMode);
+    public Result<ChapterContentResponse> generateChapterContent(@RequestParam("chapterId") Long chapterId, @RequestParam("projectId") Long projectId, @RequestParam(value = "regenerate", required = false, defaultValue = "false") Boolean regenerate, @RequestParam(value = "minWords", required = false, defaultValue = "500") Integer minWords, @RequestParam(value = "stylePrompt", required = false) String stylePrompt, @RequestParam(value = "appendMode", required = false, defaultValue = "true") Boolean appendMode, @RequestParam(value = "promptSuggestion", required = false) String promptSuggestion, @RequestParam(value = "wordCountSuggestion", required = false) Integer wordCountSuggestion) {
+        log.info("生成章节内容，章节ID: {}, 项目ID: {}, 重新生成: {}, 追加模式: {}", chapterId, projectId, regenerate, appendMode);
         try {
             // 创建章节内容生成请求
             ChapterContentRequest request = new ChapterContentRequest();
@@ -249,31 +229,26 @@ public class ChapterController {
      * @param wordCountSuggestion 字数建议
      * @return 流式响应
      */
-    @GetMapping("/generate/stream")
-    public Flux<String> generateChapterContentStream(
-            @RequestParam("chapterId") Long chapterId,
-            @RequestParam("projectId") Long projectId,
-            HttpServletResponse response,
-            @RequestParam(value = "promptSuggestion", required = false) String promptSuggestion,
-            @RequestParam(value = "wordCountSuggestion", required = false) Integer wordCountSuggestion) {
-        response.setCharacterEncoding("UTF-8");
-        log.info("流式生成章节内容，章节ID: {}, 项目ID: {}", chapterId, projectId);
-        ChapterContentRequest request = new ChapterContentRequest();
-        request.setChapterId(chapterId);
-        request.setStreamGeneration(true);
-        request.setPromptSuggestion(promptSuggestion == null ? "无" : promptSuggestion);
-        request.setWordCountSuggestion(wordCountSuggestion == null ? defaultWordsCount : wordCountSuggestion);
-        return chapterContentService.generateChapterContentStreamFlux(request);
-    }
+//    @GetMapping("/generate/stream")
+//    public Flux<String> generateChapterContentStream(
+//            @RequestParam("chapterId") Long chapterId,
+//            @RequestParam("projectId") Long projectId,
+//            HttpServletResponse response,
+//            @RequestParam(value = "promptSuggestion", required = false) String promptSuggestion,
+//            @RequestParam(value = "wordCountSuggestion", required = false) Integer wordCountSuggestion) {
+//        response.setCharacterEncoding("UTF-8");
+//        log.info("流式生成章节内容，章节ID: {}, 项目ID: {}", chapterId, projectId);
+//        ChapterContentRequest request = new ChapterContentRequest();
+//        request.setChapterId(chapterId);
+//        request.setStreamGeneration(true);
+//        request.setPromptSuggestion(promptSuggestion == null ? "无" : promptSuggestion);
+//        request.setWordCountSuggestion(wordCountSuggestion == null ? defaultWordsCount : wordCountSuggestion);
+//        return chapterContentService.generateChapterContentStreamFlux(request);
+//    }
 
     //    创建计划
     @GetMapping("/generate/execute")
-    public Result<String> generateChapterContentExecute(
-            @RequestParam("chapterId") Long chapterId,
-            @RequestParam("projectId") Long projectId,
-            HttpServletResponse response,
-            @RequestParam(value = "promptSuggestion", required = false) String promptSuggestion,
-            @RequestParam(value = "wordCountSuggestion", required = false) Integer wordCountSuggestion) {
+    public Result<String> generateChapterContentExecute(@RequestParam("chapterId") Long chapterId, @RequestParam("projectId") Long projectId, HttpServletResponse response, @RequestParam(value = "promptSuggestion", required = false) String promptSuggestion, @RequestParam(value = "wordCountSuggestion", required = false) Integer wordCountSuggestion) {
         response.setCharacterEncoding("UTF-8");
         log.info("创建章节生成计划，章节ID: {}, 项目ID: {}", chapterId, projectId);
         ChapterContentRequest request = new ChapterContentRequest();
@@ -288,26 +263,26 @@ public class ChapterController {
     @GetMapping("/generate/progress")
     public Result<Object> getGenerateProgress(@RequestParam("planId") String planId) {
         log.info("查询章节生成进度，计划ID: {}", planId);
-        
+
         // 从章节内容服务中获取计划上下文
         PlanContext planContext = chapterContentService.getPlanContextMap().get(planId);
         if (planContext == null) {
             return Result.error("计划不存在，请检查计划ID是否正确");
         }
-        
+
         // 获取计划状态
         PlanState planState = planContext.getPlanState();
         if (planState == null) {
             planState = PlanState.PLANNING; // 默认状态
         }
-        
+
         // 构建进度信息
         HashMap<String, Object> progressInfo = new HashMap<>();
         progressInfo.put("planId", planId);
         progressInfo.put("state", planState.getCode());
         progressInfo.put("stateMessage", planState.getMessage());
-        progressInfo.put("hasContent", planContext.getPlanStreams() != null && !planContext.getPlanStreams().isEmpty());
-        
+        progressInfo.put("hasContent", planContext.getPlanStream() != null);
+
         // 根据不同状态提供不同信息
         switch (planState) {
             case PLANNING:
@@ -330,7 +305,7 @@ public class ChapterController {
                 progressInfo.put("progress", 0);
                 progressInfo.put("message", "未知状态");
         }
-        
+
         return Result.success(planState.getMessage(), progressInfo);
     }
 
@@ -338,38 +313,20 @@ public class ChapterController {
     @GetMapping("/generate/content")
     public Flux<String> getGenerateContent(@RequestParam("planId") String planId) {
         log.info("查询章节生成内容，计划ID: {}", planId);
-        
+
         // 从章节内容服务中获取计划上下文
         PlanContext planContext = chapterContentService.getPlanContextMap().get(planId);
         if (planContext == null) {
             return Flux.error(new RuntimeException("计划不存在，请检查计划ID是否正确"));
         }
-        
+
         // 获取计划流
-        HashMap<Integer, Flux<String>> planStreams = planContext.getPlanStreams();
-        if (planStreams == null || planStreams.isEmpty()) {
+        Flux<String> planStreams = planContext.getPlanStream();
+        if (planStreams == null) {
             return Flux.error(new RuntimeException("计划内容尚未生成或已过期"));
         }
-        
-        // 合并所有内容流并返回
-        if (planStreams.size() == 1) {
-            // 只有一个流时直接返回
-            return planStreams.values().iterator().next();
-        } else {
-            // 有多个流时按顺序合并
-            Flux<String> mergedFlux = null;
-            for (int i = 1; i <= planStreams.size(); i++) {
-                Flux<String> flux = planStreams.get(i);
-                if (flux != null) {
-                    if (mergedFlux == null) {
-                        mergedFlux = flux;
-                    } else {
-                        mergedFlux = mergedFlux.concatWith(flux);
-                    }
-                }
-            }
-            return mergedFlux != null ? mergedFlux : Flux.empty();
-        }
+
+        return planStreams;
     }
 
     /**
@@ -381,10 +338,7 @@ public class ChapterController {
      * @return 保存结果
      */
     @PostMapping("/save")
-    public Result<Boolean> saveChapterContent(
-            @RequestParam("chapterId") Long chapterId,
-            @RequestParam(value = "appendMode", required = false, defaultValue = "false") Boolean appendMode,
-            @RequestBody String content) {
+    public Result<Boolean> saveChapterContent(@RequestParam("chapterId") Long chapterId, @RequestParam(value = "appendMode", required = false, defaultValue = "false") Boolean appendMode, @RequestBody String content) {
 
         log.info("保存章节内容，章节ID: {}, 追加模式: {}", chapterId, appendMode);
 
