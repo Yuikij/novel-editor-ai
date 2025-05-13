@@ -154,15 +154,15 @@ public class ChapterController {
         if (ids == null || ids.isEmpty()) {
             return Result.error("IDs list cannot be empty");
         }
-        
+
         chapterService.removeByIds(ids);
         return Result.success("批量删除成功", null);
     }
 
     /**
      * 自动补全或扩展章节列表到目标数量
-     * 
-     * @param projectId 项目ID
+     *
+     * @param projectId   项目ID
      * @param targetCount 目标章节总数
      * @return 补全后的章节列表
      */
@@ -180,7 +180,7 @@ public class ChapterController {
                     .stream()
                     .map(Chapter::getId)
                     .toList();
-            
+
             // 调用扩展方法
             List<Chapter> expandedChapters = chapterService.expandChapters(
                     projectId, existingIds, targetCount);
@@ -261,6 +261,39 @@ public class ChapterController {
         request.setPromptSuggestion(promptSuggestion == null ? "无" : promptSuggestion);
         request.setWordCountSuggestion(wordCountSuggestion == null ? defaultWordsCount : wordCountSuggestion);
         return chapterContentService.generateChapterContentStreamFlux(request);
+    }
+
+    //    创建计划
+    @GetMapping("/generate/execute")
+    public Result<String> generateChapterContentExecute(
+            @RequestParam("chapterId") Long chapterId,
+            @RequestParam("projectId") Long projectId,
+            HttpServletResponse response,
+            @RequestParam(value = "promptSuggestion", required = false) String promptSuggestion,
+            @RequestParam(value = "wordCountSuggestion", required = false) Integer wordCountSuggestion) {
+        response.setCharacterEncoding("UTF-8");
+        log.info("创建章节生成计划，章节ID: {}, 项目ID: {}", chapterId, projectId);
+        ChapterContentRequest request = new ChapterContentRequest();
+        request.setChapterId(chapterId);
+        request.setStreamGeneration(true);
+        request.setPromptSuggestion(promptSuggestion == null ? "无" : promptSuggestion);
+        request.setWordCountSuggestion(wordCountSuggestion == null ? defaultWordsCount : wordCountSuggestion);
+        return chapterContentService.generateChapterContentExecute(request);
+    }
+
+    //    查询计划进度
+    @GetMapping("/generate/progress")
+    public Result<String> getGenerateProgress(@RequestParam("planId") String planId) {
+        log.info("查询章节生成进度，计划ID: {}", planId);
+//        chapterContentService.getGenerateProgress(planId);
+//        String progress = chapterContentService.getGenerateProgress(chapterId);
+        return Result.success("");
+    }
+
+    //    查询文章内容
+    @GetMapping("/generate/content")
+    public Flux<String> getGenerateContent(@RequestParam("planId") String planId) {
+        return null;
     }
 
     /**

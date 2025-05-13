@@ -1,5 +1,6 @@
 package com.soukon.novelEditorAi.service;
 
+import com.soukon.novelEditorAi.common.Result;
 import com.soukon.novelEditorAi.model.chapter.ChapterContentRequest;
 import com.soukon.novelEditorAi.model.chapter.ChapterContentResponse;
 import reactor.core.publisher.Flux;
@@ -46,4 +47,6 @@ public interface ChapterContentService {
     default boolean saveChapterContent(Long chapterId, String content) {
         return saveChapterContent(chapterId, content, false);
     }
+
+    Result<String> generateChapterContentExecute(ChapterContentRequest request);
 } 

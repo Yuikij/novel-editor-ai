@@ -1,5 +1,8 @@
 package com.soukon.novelEditorAi.service.impl;
 
+import com.alibaba.nacos.common.utils.UuidUtils;
+import com.soukon.novelEditorAi.agent.WritingAgent;
+import com.soukon.novelEditorAi.common.Result;
 import com.soukon.novelEditorAi.entities.Chapter;
 import com.soukon.novelEditorAi.entities.Project;
 import com.soukon.novelEditorAi.entities.Character;
@@ -12,10 +15,7 @@ import com.soukon.novelEditorAi.mapper.CharacterMapper;
 import com.soukon.novelEditorAi.mapper.PlotMapper;
 import com.soukon.novelEditorAi.mapper.ProjectMapper;
 import com.soukon.novelEditorAi.mapper.WorldMapper;
-import com.soukon.novelEditorAi.model.chapter.ChapterContentRequest;
-import com.soukon.novelEditorAi.model.chapter.ChapterContentResponse;
-import com.soukon.novelEditorAi.model.chapter.ChapterContext;
-import com.soukon.novelEditorAi.model.chapter.ReasoningRes;
+import com.soukon.novelEditorAi.model.chapter.*;
 import com.soukon.novelEditorAi.service.ChapterContentService;
 import com.soukon.novelEditorAi.service.RagService;
 import com.soukon.novelEditorAi.service.ProjectService;
@@ -26,6 +26,7 @@ import com.soukon.novelEditorAi.service.PlotService;
 import com.soukon.novelEditorAi.service.CharacterRelationshipService;
 import com.soukon.novelEditorAi.service.OutlinePlotPointService;
 import com.soukon.novelEditorAi.service.PromptService;
+import lombok.Getter;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.chat.messages.Message;
@@ -43,10 +44,10 @@ import org.springframework.context.annotation.Lazy;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.time.LocalDateTime;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.soukon.novelEditorAi.model.chapter.PlotRes;
 import com.soukon.novelEditorAi.model.chapter.ReasoningRes;
 import org.springframework.ai.converter.BeanOutputConverter;
 
@@ -73,6 +74,9 @@ public class ChapterContentServiceImpl implements ChapterContentService {
     private final PlotService plotService;
     private final CharacterRelationshipService characterRelationshipService;
     private final OutlinePlotPointService outlinePlotPointService;
+
+    @Getter
+    private ConcurrentHashMap<String, PlanContext> planContextMap = new ConcurrentHashMap<>();
 
 
     @Autowired
@@ -166,62 +170,63 @@ public class ChapterContentServiceImpl implements ChapterContentService {
         // 执行推理过程，分析章节要求并制定写作计划
         String reasoningResult;
         ReasoningRes reasoningRes;
+        PlanRes planRes;
         try {
-            BeanOutputConverter<ReasoningRes> converter = new BeanOutputConverter<>(ReasoningRes.class);
+            BeanOutputConverter<PlanRes> converter = new BeanOutputConverter<>(PlanRes.class);
             log.info("[Reasoning] 正在分析章节要求并制定写作计划");
             reasoningResult = llmService.getAgentChatClient(request.getChapterId() + "").getChatClient().prompt(new Prompt(reasoningMessages)).call().content();
 //            reasoningResult = chatClient.prompt(new Prompt(reasoningMessages)).call().content();
-            reasoningRes = reasoningResult == null ? null : converter.convert(reasoningResult);
-            log.info("[Reasoning] 完成章节分析和写作计划，长度: {}", reasoningResult.length());
+            planRes = reasoningResult == null ? null : converter.convert(reasoningResult);
+            log.info("[Reasoning] 完成章节分析和写作计划: {}", planRes);
         } catch (Exception e) {
             log.error("[Reasoning] 章节分析失败: {}", e.getMessage(), e);
             throw new RuntimeException("分析章节要求失败：" + e.getMessage(), e);
         }
 
         // 将reasoningRes保存到数据库
-        if (reasoningRes != null && reasoningRes.getPlotList() != null && !reasoningRes.getPlotList().isEmpty()) {
-            log.info("[Reasoning] 保存章节情节数据，情节数量: {}", reasoningRes.getPlotList().size());
-
-            // 获取章节ID
-            Long chapterId = request.getChapterId();
-
-            // 获取项目ID
-            Long projectId = context.getProjectId();
-
-            // 先删除原有的章节情节数据，避免重复
-            plotMapper.delete(
-                    Wrappers.<Plot>lambdaQuery()
-                            .eq(Plot::getChapterId, chapterId)
-            );
-
-            // 遍历情节列表并保存
-            for (int i = 0; i < reasoningRes.getPlotList().size(); i++) {
-                PlotRes plotRes = reasoningRes.getPlotList().get(i);
-
-                // 创建新的Plot实体
-                Plot plot = new Plot();
-                plot.setProjectId(projectId);
-                plot.setChapterId(chapterId);
-                plot.setTitle(plotRes.getTitle());
-                plot.setDescription(plotRes.getDescription());
-                plot.setSortOrder(plotRes.getSortOrder() != null ? plotRes.getSortOrder() : i + 1);
-                plot.setStatus(plotRes.getStatus());
-                plot.setCompletionPercentage(plotRes.getCompletionPercentage());
-                plot.setWordCountGoal(plotRes.getWordCountGoal());
-
-                // 设置创建和更新时间
-                LocalDateTime now = LocalDateTime.now();
-                plot.setCreatedAt(now);
-                plot.setUpdatedAt(now);
-
-                // 保存情节
-                plotMapper.insert(plot);
-            }
-
-            log.info("[Reasoning] 成功保存章节情节数据");
-        } else {
-            log.warn("[Reasoning] 章节情节数据为空，不保存");
-        }
+//        if (reasoningRes != null && reasoningRes.getPlotList() != null && !reasoningRes.getPlotList().isEmpty()) {
+//            log.info("[Reasoning] 保存章节情节数据，情节数量: {}", reasoningRes.getPlotList().size());
+//
+//            // 获取章节ID
+//            Long chapterId = request.getChapterId();
+//
+//            // 获取项目ID
+//            Long projectId = context.getProjectId();
+//
+//            // 先删除原有的章节情节数据，避免重复
+//            plotMapper.delete(
+//                    Wrappers.<Plot>lambdaQuery()
+//                            .eq(Plot::getChapterId, chapterId)
+//            );
+//
+//            // 遍历情节列表并保存
+//            for (int i = 0; i < reasoningRes.getPlotList().size(); i++) {
+//                PlotRes plotRes = reasoningRes.getPlotList().get(i);
+//
+//                // 创建新的Plot实体
+//                Plot plot = new Plot();
+//                plot.setProjectId(projectId);
+//                plot.setChapterId(chapterId);
+//                plot.setTitle(plotRes.getTitle());
+//                plot.setDescription(plotRes.getDescription());
+//                plot.setSortOrder(plotRes.getSortOrder() != null ? plotRes.getSortOrder() : i + 1);
+//                plot.setStatus(plotRes.getStatus());
+//                plot.setCompletionPercentage(plotRes.getCompletionPercentage());
+//                plot.setWordCountGoal(plotRes.getWordCountGoal());
+//
+//                // 设置创建和更新时间
+//                LocalDateTime now = LocalDateTime.now();
+//                plot.setCreatedAt(now);
+//                plot.setUpdatedAt(now);
+//
+//                // 保存情节
+//                plotMapper.insert(plot);
+//            }
+//
+//            log.info("[Reasoning] 成功保存章节情节数据");
+//        } else {
+//            log.warn("[Reasoning] 章节情节数据为空，不保存");
+//        }
 
         // 第二阶段：Acting - 根据分析结果执行写作
         log.info("[Acting] 开始根据分析结果生成章节内容");
@@ -358,6 +363,24 @@ public class ChapterContentServiceImpl implements ChapterContentService {
         return saveChapterContent(chapterId, content, false);
     }
 
+    @Override
+    public Result<String> generateChapterContentExecute(ChapterContentRequest request) {
+        String planId = UuidUtils.generateUuid();
+        planContextMap.put(planId, new PlanContext(planId));
+        // 异步执行任务
+        CompletableFuture.supplyAsync(() -> {
+            try {
+                return generateChapterContentStreamFlux(request);
+            }
+            catch (Exception e) {
+                log.error("执行计划失败", e);
+                throw new RuntimeException("执行计划失败: " + e.getMessage(), e);
+            }
+        });
+
+        return Result.success("执行成功", planId);
+    }
+
     /**
      * 验证请求参数
      */
@@ -453,6 +476,9 @@ public class ChapterContentServiceImpl implements ChapterContentService {
 
     @Override
     public Flux<String> generateChapterContentStreamFlux(ChapterContentRequest request) {
+
+        String planId = UuidUtils.generateUuid();
+        planContextMap.put(planId, new PlanContext(planId));
         long startTime = System.currentTimeMillis();
 
         // 第一阶段：Reasoning - 理解和分析需求
@@ -483,72 +509,39 @@ public class ChapterContentServiceImpl implements ChapterContentService {
 
 //        // 执行推理过程，分析章节要求并制定写作计划
         String reasoningResult;
-        ReasoningRes reasoningRes;
+        PlanRes planRes;
         try {
-            BeanOutputConverter<ReasoningRes> converter = new BeanOutputConverter<>(ReasoningRes.class);
+            BeanOutputConverter<PlanRes> converter = new BeanOutputConverter<>(PlanRes.class);
             log.info("[Reasoning] 正在分析章节要求并制定写作计划");
 
             reasoningResult = llmService.getAgentChatClient(request.getChapterId() + "").getChatClient()
                     .prompt(new Prompt(reasoningMessages)).call().content();
-            reasoningRes = reasoningResult == null ? null : converter.convert(reasoningResult);
-            log.info("[Reasoning] 完成章节分析和写作计划，长度: {}", reasoningResult.length());
+            planRes = reasoningResult == null ? null : converter.convert(reasoningResult);
+            log.info("[Reasoning] 完成章节分析和写作计划: {}", planRes);
         } catch (Exception e) {
             log.error("[Reasoning] 章节分析失败: {}", e.getMessage(), e);
             throw new RuntimeException("分析章节要求失败：" + e.getMessage(), e);
         }
-        if (reasoningRes == null) {
+        if (planRes == null) {
             log.error("[Reasoning] 章节分析结果为空");
             throw new RuntimeException("分析章节要求失败：结果为空");
         }
         // 将reasoningRes保存到数据库
-        if (reasoningRes != null && reasoningRes.getPlotList() != null && !reasoningRes.getPlotList().isEmpty()) {
-            log.info("[Reasoning] 保存章节情节数据，情节数量: {}", reasoningRes.getPlotList().size());
-
-            // 获取章节ID
-            Long chapterId = request.getChapterId();
-
-            // 获取项目ID
-            Long projectId = context.getProjectId();
-
-            // 先删除原有的章节情节数据，避免重复
-            plotMapper.delete(
-                    Wrappers.<Plot>lambdaQuery()
-                            .eq(Plot::getChapterId, chapterId)
-            );
-
-            // 遍历情节列表并保存
-            for (int i = 0; i < reasoningRes.getPlotList().size(); i++) {
-                PlotRes plotRes = reasoningRes.getPlotList().get(i);
-
-                // 创建新的Plot实体
-                Plot plot = new Plot();
-                plot.setProjectId(projectId);
-                plot.setChapterId(chapterId);
-                plot.setTitle(plotRes.getTitle());
-                plot.setDescription(plotRes.getDescription());
-                plot.setSortOrder(plotRes.getSortOrder() != null ? plotRes.getSortOrder() : i + 1);
-                plot.setStatus(plotRes.getStatus());
-                plot.setCompletionPercentage(plotRes.getCompletionPercentage());
-                plot.setWordCountGoal(plotRes.getWordCountGoal());
-
-                // 设置创建和更新时间
-                LocalDateTime now = LocalDateTime.now();
-                plot.setCreatedAt(now);
-                plot.setUpdatedAt(now);
-
-                // 保存情节
-                plotMapper.insert(plot);
-            }
-
-            log.info("[Reasoning] 成功保存章节情节数据");
-        } else {
-            log.warn("[Reasoning] 章节情节数据为空，不保存");
-        }
         // 第二阶段：Acting - 根据分析结果执行写作
         log.info("[Acting] 开始根据分析结果生成章节内容");
-
+        List<String> planList = planRes.getPlanList();
+        if (planList == null || planList.isEmpty()) {
+            log.error("[Acting] 章节计划列表为空");
+            throw new RuntimeException("生成章节内容失败：计划列表为空");
+        }
+        // 生成章节内容
+        WritingAgent writingAgent = new WritingAgent();
+        planList.forEach(e -> {
+//            writingAgent.run(e, planId, request);
+//            run(e, planId, request);
+        });
         // 构建执行提示词，将推理结果融入提示中 - 使用PromptService
-        List<Message> actingMessages = promptService.buildActingPrompt(request, reasoningRes.toString());
+        List<Message> actingMessages = promptService.buildActingPrompt(request, planRes.toString());
 
         // 调用AI模型生成实际章节内容
         log.info("[Acting] 正在以流式方式生成章节内容");

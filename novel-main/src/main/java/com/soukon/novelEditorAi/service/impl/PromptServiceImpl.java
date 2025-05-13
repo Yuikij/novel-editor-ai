@@ -4,6 +4,7 @@ import com.soukon.novelEditorAi.entities.Chapter;
 import com.soukon.novelEditorAi.entities.Project;
 import com.soukon.novelEditorAi.model.chapter.ChapterContentRequest;
 import com.soukon.novelEditorAi.model.chapter.ChapterContext;
+import com.soukon.novelEditorAi.model.chapter.PlanRes;
 import com.soukon.novelEditorAi.model.chapter.ReasoningRes;
 import com.soukon.novelEditorAi.service.*;
 import lombok.extern.slf4j.Slf4j;
@@ -69,16 +70,18 @@ public class PromptServiceImpl implements PromptService {
         if (context == null) {
             throw new IllegalStateException("章节上下文未构建");
         }
-        BeanOutputConverter<ReasoningRes> converter = new BeanOutputConverter<>(ReasoningRes.class);
+        BeanOutputConverter<PlanRes> converter = new BeanOutputConverter<>(PlanRes.class);
 
         // 系统提示词 - 引导AI进行推理分析
         String systemPrompt = """
-                你是一位专业的知名小说作家，擅长根据提供的上下文、在指定的章节中，按照要求评估已有情节的完成情况和指定写作计划。
+                你是一位专业的知名小说作家，擅长根据提供的上下文、在指定的章节中，按照要求评估已有情节的完成情况和制定写作计划。
 
-                你的任务是根据上下文和当前情节的详情和完成情况，推断一个合理的写作目标（例如，推进情节、发展角色关系、描写关键场景等），并制定一个包含3-5个步骤的写作计划。每个步骤应：
+                你的任务是根据上下文和当前情节的详情和当前完成情况，推断一个合理的写作目标（例如，推进情节、发展角色关系、描写关键场景等），并制定一个包含3-5个步骤的写作计划。每个步骤应：
                 - 明确一个具体的写作任务（如“描写主角进入新场景”或“编写角色间的冲突对话”）。
                 - 与上下文保持一致，推动故事发展。
                 - 具有逻辑性和连贯性。
+                
+                然后给出完成计划之后的情节完成百分比
                 
                 输出格式：
                 1. 推断的写作目标：{简述目标}
@@ -94,7 +97,7 @@ public class PromptServiceImpl implements PromptService {
 
         // 用户提示词 - 包含章节上下文信息
         StringBuilder userPromptBuilder = new StringBuilder();
-        userPromptBuilder.append("请根据以下上下文信息，分析并创作符合要求的情节列表：\n\n");
+        userPromptBuilder.append("请根据以下上下文信息，分析并创作符合要求的写作计划：\n\n");
 
         extracted(request, userPromptBuilder, context);
 

@@ -153,7 +153,7 @@ public abstract class BaseAgent {
 	 */
 	protected abstract Message getNextStepWithEnvMessage();
 
-	public abstract List<ToolCallback> getToolCallList();
+
 
 	public BaseAgent(LlmService llmService) {
 		this.llmService = llmService;
