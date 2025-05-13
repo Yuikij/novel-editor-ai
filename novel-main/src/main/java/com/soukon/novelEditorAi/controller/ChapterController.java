@@ -7,6 +7,8 @@ import com.soukon.novelEditorAi.entities.Chapter;
 import com.soukon.novelEditorAi.service.ChapterService;
 import com.soukon.novelEditorAi.model.chapter.ChapterContentRequest;
 import com.soukon.novelEditorAi.model.chapter.ChapterContentResponse;
+import com.soukon.novelEditorAi.model.chapter.PlanContext;
+import com.soukon.novelEditorAi.model.chapter.PlanState;
 import com.soukon.novelEditorAi.service.ChapterContentService;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +19,7 @@ import reactor.core.publisher.Flux;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.HashMap;
 
 /**
  * 章节控制器
@@ -283,17 +286,90 @@ public class ChapterController {
 
     //    查询计划进度
     @GetMapping("/generate/progress")
-    public Result<String> getGenerateProgress(@RequestParam("planId") String planId) {
+    public Result<Object> getGenerateProgress(@RequestParam("planId") String planId) {
         log.info("查询章节生成进度，计划ID: {}", planId);
-//        chapterContentService.getGenerateProgress(planId);
-//        String progress = chapterContentService.getGenerateProgress(chapterId);
-        return Result.success("");
+        
+        // 从章节内容服务中获取计划上下文
+        PlanContext planContext = chapterContentService.getPlanContextMap().get(planId);
+        if (planContext == null) {
+            return Result.error("计划不存在，请检查计划ID是否正确");
+        }
+        
+        // 获取计划状态
+        PlanState planState = planContext.getPlanState();
+        if (planState == null) {
+            planState = PlanState.PLANNING; // 默认状态
+        }
+        
+        // 构建进度信息
+        HashMap<String, Object> progressInfo = new HashMap<>();
+        progressInfo.put("planId", planId);
+        progressInfo.put("state", planState.getCode());
+        progressInfo.put("stateMessage", planState.getMessage());
+        progressInfo.put("hasContent", planContext.getPlanStreams() != null && !planContext.getPlanStreams().isEmpty());
+        
+        // 根据不同状态提供不同信息
+        switch (planState) {
+            case PLANNING:
+                progressInfo.put("progress", 0);
+                progressInfo.put("message", "正在规划章节内容");
+                break;
+            case IN_PROGRESS:
+                progressInfo.put("progress", 50);
+                progressInfo.put("message", "正在生成章节内容");
+                break;
+            case GENERATING:
+                progressInfo.put("progress", 75);
+                progressInfo.put("message", "内容生成中");
+                break;
+            case COMPLETED:
+                progressInfo.put("progress", 100);
+                progressInfo.put("message", "内容已生成完成");
+                break;
+            default:
+                progressInfo.put("progress", 0);
+                progressInfo.put("message", "未知状态");
+        }
+        
+        return Result.success(planState.getMessage(), progressInfo);
     }
 
     //    查询文章内容
     @GetMapping("/generate/content")
     public Flux<String> getGenerateContent(@RequestParam("planId") String planId) {
-        return null;
+        log.info("查询章节生成内容，计划ID: {}", planId);
+        
+        // 从章节内容服务中获取计划上下文
+        PlanContext planContext = chapterContentService.getPlanContextMap().get(planId);
+        if (planContext == null) {
+            return Flux.error(new RuntimeException("计划不存在，请检查计划ID是否正确"));
+        }
+        
+        // 获取计划流
+        HashMap<Integer, Flux<String>> planStreams = planContext.getPlanStreams();
+        if (planStreams == null || planStreams.isEmpty()) {
+            return Flux.error(new RuntimeException("计划内容尚未生成或已过期"));
+        }
+        
+        // 合并所有内容流并返回
+        if (planStreams.size() == 1) {
+            // 只有一个流时直接返回
+            return planStreams.values().iterator().next();
+        } else {
+            // 有多个流时按顺序合并
+            Flux<String> mergedFlux = null;
+            for (int i = 1; i <= planStreams.size(); i++) {
+                Flux<String> flux = planStreams.get(i);
+                if (flux != null) {
+                    if (mergedFlux == null) {
+                        mergedFlux = flux;
+                    } else {
+                        mergedFlux = mergedFlux.concatWith(flux);
+                    }
+                }
+            }
+            return mergedFlux != null ? mergedFlux : Flux.empty();
+        }
     }
 
     /**

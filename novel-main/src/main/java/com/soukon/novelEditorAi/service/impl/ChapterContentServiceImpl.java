@@ -45,6 +45,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.time.LocalDateTime;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.HashMap;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -366,14 +367,32 @@ public class ChapterContentServiceImpl implements ChapterContentService {
     @Override
     public Result<String> generateChapterContentExecute(ChapterContentRequest request) {
         String planId = UuidUtils.generateUuid();
-        planContextMap.put(planId, new PlanContext(planId));
+        
+        // 创建新的计划上下文
+        PlanContext planContext = new PlanContext(planId);
+        planContext.setPlanState(PlanState.PLANNING);
+        planContext.setPlanStreams(new HashMap<>());
+        planContextMap.put(planId, planContext);
+        
         // 异步执行任务
         CompletableFuture.supplyAsync(() -> {
             try {
-                return generateChapterContentStreamFlux(request);
+                planContext.setPlanState(PlanState.IN_PROGRESS);
+                
+                // 生成内容
+                Flux<String> contentFlux = generateChapterContentStreamFlux(request);
+                
+                // 将内容流存入计划上下文
+                planContext.getPlanStreams().put(1, contentFlux);
+                
+                // 更新计划状态
+                planContext.setPlanState(PlanState.COMPLETED);
+                
+                return contentFlux;
             }
             catch (Exception e) {
                 log.error("执行计划失败", e);
+                planContext.setPlanState(PlanState.COMPLETED);  // 即使失败也标记为完成
                 throw new RuntimeException("执行计划失败: " + e.getMessage(), e);
             }
         });

@@ -3,7 +3,10 @@ package com.soukon.novelEditorAi.service;
 import com.soukon.novelEditorAi.common.Result;
 import com.soukon.novelEditorAi.model.chapter.ChapterContentRequest;
 import com.soukon.novelEditorAi.model.chapter.ChapterContentResponse;
+import com.soukon.novelEditorAi.model.chapter.PlanContext;
 import reactor.core.publisher.Flux;
+
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 章节内容生成服务接口
@@ -48,5 +51,16 @@ public interface ChapterContentService {
         return saveChapterContent(chapterId, content, false);
     }
 
+    /**
+     * 创建章节内容生成计划
+     * @param request 包含生成参数的请求对象
+     * @return 计划ID和状态
+     */
     Result<String> generateChapterContentExecute(ChapterContentRequest request);
+    
+    /**
+     * 获取计划上下文映射表
+     * @return 计划上下文映射表
+     */
+    ConcurrentHashMap<String, PlanContext> getPlanContextMap();
 } 
