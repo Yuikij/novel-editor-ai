@@ -1,4 +1,3 @@
-
 /*
  * Copyright 2025 the original author or authors.
  *
@@ -17,11 +16,13 @@
 package com.soukon.novelEditorAi.agent;
 
 import com.soukon.novelEditorAi.llm.LlmService;
+import com.soukon.novelEditorAi.model.chapter.ChapterContentRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.messages.AssistantMessage.ToolCall;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
+import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -32,11 +33,14 @@ import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.model.tool.ToolExecutionResult;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
+import reactor.core.publisher.Flux;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import static org.springframework.ai.chat.client.advisor.AbstractChatMemoryAdvisor.CHAT_MEMORY_CONVERSATION_ID_KEY;
@@ -46,149 +50,241 @@ public class WritingAgent extends ReActAgent {
 
     private static final Logger log = LoggerFactory.getLogger(WritingAgent.class);
 
-    private final String nextStepPrompt = """
+    private final String reactSystemPrompt = """
+            你是一个专业小说写作助手，使用ReAct（思考+行动）模式工作，严格遵循以下流程：
+            
+            1. 思考：分析当前写作步骤，提出相关问题并给出简短回答
+            2. 行动：基于思考结果，创作对应的小说内容
+            3. 评估：判断是否达到终止条件，决定继续或结束
+            
+            每个步骤要有明确的标记和格式。
+            """;
 
+    private final String thinkPromptTemplate = """
+            思考：
+            你正在执行写作计划中的第{stepNumber}步：{stepContent}。
+            
+            在开始写作前，进行结构化思考：
+            1. 自动生成3个与此步骤相关的问题，考虑以下方面：
+               - 场景的氛围、感官细节或设定。
+               - 角色的情绪、动机或行为。
+               - 叙事的节奏、语气或情节推进。
+            2. 为每个问题提供简短的回答（每回答50字以内）。
+            
+            输出格式：
+            - 问题1：{生成的问题}
+              - 回答：{简短回答}
+            - 问题2：{生成的问题}
+              - 回答：{简短回答}
+            - 问题3：{生成的问题}
+              - 回答：{简短回答}
+            
+            确保问题和回答与上下文和步骤目标一致，为后续写作提供清晰的指导。
+            """;
 
+    private final String actionPromptTemplate = """
+            行动：
+            
+            根据你的思考结果，执行写作计划中的第{stepNumber}步：{stepContent}。
+            
+            写作指南：
+            - 使用生动、具体的语言，营造{mood}的氛围。
+            - 保持与上下文的连贯性，特别是上一段内容：{previousContent}。
+            - 字数限制为{wordCount}字。
+            - 融入符合角色性格和情节发展的细节，必要时添加创意元素以增强叙事。
+            
+            现在撰写文本。
+            """;
+
+    private final String evaluatePromptTemplate = """
+            
             完成当前步骤后，返回写作计划并执行下一步。
-
+            
             终止条件：
-                    - 计划中的所有步骤均已完成，或
-            - 总字数达到{默认1000字，或由用户指定}，或
+            - 计划中的所有步骤均已完成，或
+            - 总字数达到{targetWordCount}字，或
             - 上下文表明章节或场景已自然结束（例如，达到情节高潮或转折点）。
-
+            
             如果继续，简要说明下一步的重点；如果停止，说明原因并总结已完成的内容。
-                        为实现我的目标，下一步应该做什么？
-
-                        重点：
-                        1. 使用'get_text'操作获取页面内容，而不是滚动
-                        2. 不用担心内容可见性或视口位置
-                        3. 专注于基于文本的信息提取
-                        4. 直接处理获取的文本数据
-                        5. 重要：你必须在回复中使用至少一个工具才能取得进展！
-
-                        考虑可见的内容和当前视口之外可能存在的内容。
-                        有条理地行动 - 记住你的进度和迄今为止学到的知识。
-                        """;
-
+            """;
 
     private ToolCallbackProvider toolCallbackProvider;
-
     private ChatResponse response;
-
     private Prompt userPrompt;
-
-    public WritingAgent(LlmService llmService, String name, String description, String systemPrompt
-    ) {
-        super(llmService);
-
-
-    }
+    
+    private String planId;
+    private int currentStepNumber = 1;
+    private List<String> planSteps = new ArrayList<>();
+    private int currentWordCount = 0;
+    private int targetWordCount = 1000; // 默认目标字数
+    private String previousContent = "无前文";
+    private String mood = "自然流畅";
+    private StringBuilder generatedContent = new StringBuilder();
+    private ChapterContentRequest request;
+    private Map<String, Object> stepData = new HashMap<>();
 
     public WritingAgent() {
         super(null);
     }
+    
+    public WritingAgent(LlmService llmService) {
+        super(llmService);
+    }
+
+    public Flux<String> run(String planStep, String planId, ChapterContentRequest request) {
+        this.planId = planId;
+        this.request = request;
+        this.planSteps.add(planStep);
+        
+        // 从请求中获取目标字数，如果有的话
+        if (request.getWordCountSuggestion() != null) {
+            this.targetWordCount = request.getWordCountSuggestion();
+        }
+        
+        // 创建一个Flux用于返回生成的内容
+        List<String> contentPieces = new ArrayList<>();
+        AtomicInteger stepCounter = new AtomicInteger(1);
+        
+        // 执行所有步骤，直到满足终止条件
+        while (currentStepNumber <= planSteps.size() && currentWordCount < targetWordCount) {
+            AgentExecResult result = executeWritingStep(currentStepNumber);
+            if (result.getResult() != null && !result.getResult().isEmpty()) {
+                contentPieces.add(result.getResult());
+                log.info("已完成第{}步写作，当前总字数: {}", currentStepNumber, currentWordCount);
+                currentStepNumber++;
+            }
+            
+            if (result.getState() == AgentState.COMPLETED) {
+                log.info("写作完成: {}", result.getResult());
+                break;
+            }
+        }
+        
+        return Flux.fromIterable(contentPieces);
+    }
+    
+    private AgentExecResult executeWritingStep(int stepNumber) {
+        try {
+            // 准备当前步骤数据
+            stepData.clear();
+            stepData.put("stepNumber", stepNumber);
+            stepData.put("stepContent", planSteps.get(stepNumber - 1));
+            stepData.put("previousContent", previousContent);
+            stepData.put("mood", mood);
+            stepData.put("wordCount", "150-300");
+            stepData.put("targetWordCount", String.valueOf(targetWordCount));
+            
+            // 执行思考阶段
+            String thoughtResult = executeThinkPhase();
+            log.debug("思考阶段结果: {}", thoughtResult);
+            
+            // 执行行动阶段
+            String actionResult = executeActionPhase();
+            log.debug("行动阶段结果: {}", actionResult);
+            
+            // 更新上下文
+            currentWordCount += actionResult.length();
+            previousContent = getLastParagraph(actionResult);
+            generatedContent.append(actionResult).append("\n\n");
+            
+            // 判断是否需要终止
+            boolean shouldTerminate = currentStepNumber >= planSteps.size() || 
+                                     currentWordCount >= targetWordCount;
+            
+            if (shouldTerminate) {
+                return new AgentExecResult(actionResult, AgentState.COMPLETED);
+            } else {
+                return new AgentExecResult(actionResult, AgentState.IN_PROGRESS);
+            }
+            
+        } catch (Exception e) {
+            log.error("写作步骤执行失败: {}", e.getMessage(), e);
+            return new AgentExecResult("写作执行失败: " + e.getMessage(), AgentState.FAILED);
+        }
+    }
+    
+    private String executeThinkPhase() {
+        PromptTemplate promptTemplate = new PromptTemplate(thinkPromptTemplate);
+        Message thinkMessage = promptTemplate.createMessage(stepData);
+        
+        // 调用LLM生成思考结果
+        Prompt prompt = new Prompt(List.of(thinkMessage));
+        String result = llmService.getAgentChatClient(planId)
+                .getChatClient()
+                .prompt(prompt)
+                .call()
+                .content();
+                
+        return result;
+    }
+    
+    private String executeActionPhase() {
+        PromptTemplate promptTemplate = new PromptTemplate(actionPromptTemplate);
+        Message actionMessage = promptTemplate.createMessage(stepData);
+        
+        // 调用LLM生成行动结果
+        Prompt prompt = new Prompt(List.of(actionMessage));
+        String result = llmService.getAgentChatClient(planId)
+                .getChatClient()
+                .prompt(prompt)
+                .call()
+                .content();
+                
+        return result;
+    }
+    
+    private String getLastParagraph(String text) {
+        if (text == null || text.isEmpty()) {
+            return "无前文";
+        }
+        
+        String[] paragraphs = text.split("\n\n");
+        if (paragraphs.length > 0) {
+            String lastParagraph = paragraphs[paragraphs.length - 1].trim();
+            // 如果段落太长，只返回最后100个字
+            if (lastParagraph.length() > 100) {
+                return "..." + lastParagraph.substring(lastParagraph.length() - 100);
+            }
+            return lastParagraph;
+        }
+        
+        return text.length() > 100 ? "..." + text.substring(text.length() - 100) : text;
+    }
 
     @Override
     protected boolean think() {
-
-        try {
-            List<Message> messages = new ArrayList<>();
-            addThinkPrompt(messages);
-
-            ChatOptions chatOptions = ToolCallingChatOptions.builder().internalToolExecutionEnabled(false).build();
-            Message nextStepMessage = getNextStepWithEnvMessage();
-            messages.add(nextStepMessage);
-            // in the
-
-            log.debug("Messages prepared for the prompt: {}", messages);
-
-            userPrompt = new Prompt(messages, chatOptions);
-
-            response = llmService.getAgentChatClient(getPlanId())
-                    .getChatClient()
-                    .prompt(userPrompt)
-                    .advisors(memoryAdvisor -> memoryAdvisor.param(CHAT_MEMORY_CONVERSATION_ID_KEY, getPlanId())
-                            .param(CHAT_MEMORY_RETRIEVE_SIZE_KEY, 100))
-                    .call()
-                    .chatResponse();
-
-            List<ToolCall> toolCalls = response.getResult().getOutput().getToolCalls();
-            String responseByLLm = response.getResult().getOutput().getText();
-
-
-            log.info(String.format("✨ %s's thoughts: %s", getName(), responseByLLm));
-            log.info(String.format("🛠️ %s selected %d tools to use", getName(), toolCalls.size()));
-
-            if (responseByLLm != null && !responseByLLm.isEmpty()) {
-                log.info(String.format("💬 %s's response: %s", getName(), responseByLLm));
-            }
-            if (!toolCalls.isEmpty()) {
-                log.info(String.format("🧰 Tools being prepared: %s",
-                        toolCalls.stream().map(ToolCall::name).collect(Collectors.toList())));
-
-            }
-
-
-            return !toolCalls.isEmpty();
-        } catch (Exception e) {
-            log.error(String.format("🚨 Oops! The %s's thinking process hit a snag: %s", getName(), e.getMessage()));
-
-            return false;
-        }
+        // 这个方法由父类ReActAgent调用，但我们使用自己的执行流程
+        return false;
     }
 
     @Override
     protected AgentExecResult act() {
-        try {
-
-            AgentExecResult agentExecResult = null;
-            return agentExecResult;
-        } catch (Exception e) {
-            ToolCall toolCall = response.getResult().getOutput().getToolCalls().get(0);
-            ToolResponseMessage.ToolResponse toolResponse = new ToolResponseMessage.ToolResponse(toolCall.id(),
-                    toolCall.name(), "Error: " + e.getMessage());
-            ToolResponseMessage toolResponseMessage = new ToolResponseMessage(List.of(toolResponse), Map.of());
-            llmService.getAgentChatClient(getPlanId()).getMemory().add(getPlanId(), toolResponseMessage);
-            log.error(e.getMessage());
-
-
-            return new AgentExecResult(e.getMessage(), AgentState.FAILED);
-        }
+        // 这个方法由父类ReActAgent调用，但我们使用自己的执行流程
+        return new AgentExecResult("Not implemented", AgentState.FAILED);
     }
 
     @Override
     protected Message getNextStepWithEnvMessage() {
-        String nextStepPrompt = """
-
-                CURRENT STEP ENVIRONMENT STATUS:
-                {current_step_env_data}
-
-                """;
-        nextStepPrompt = nextStepPrompt += this.nextStepPrompt;
-        PromptTemplate promptTemplate = new PromptTemplate(nextStepPrompt);
-        Message userMessage = promptTemplate.createMessage(getData());
-        return userMessage;
+        return new UserMessage("继续");
     }
 
     @Override
     public String getName() {
-        return "";
+        return "WritingAgent";
     }
 
     @Override
     public String getDescription() {
-        return "";
+        return "一个使用ReAct模式进行小说写作的智能代理";
     }
 
     @Override
     protected Message addThinkPrompt(List<Message> messages) {
-        super.addThinkPrompt(messages);
-        SystemPromptTemplate promptTemplate = new SystemPromptTemplate("");
+        SystemPromptTemplate promptTemplate = new SystemPromptTemplate(reactSystemPrompt);
         Message systemMessage = promptTemplate.createMessage(getData());
         messages.add(systemMessage);
         return systemMessage;
     }
-
 
     public void addEnvData(String key, String value) {
         Map<String, Object> data = super.getData();
@@ -197,6 +293,8 @@ public class WritingAgent extends ReActAgent {
         }
         data.put(key, value);
     }
-
-
+    
+    public String getPlanId() {
+        return this.planId;
+    }
 }

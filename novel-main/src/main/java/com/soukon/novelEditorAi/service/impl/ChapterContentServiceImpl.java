@@ -42,6 +42,7 @@ import reactor.core.publisher.Flux;
 import org.springframework.context.annotation.Lazy;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
 import java.time.LocalDateTime;
 import java.util.concurrent.ConcurrentHashMap;
@@ -526,7 +527,7 @@ public class ChapterContentServiceImpl implements ChapterContentService {
         // 构建推理指导提示词 - 使用PromptService
         List<Message> reasoningMessages = promptService.buildReasoningPrompt(request);
 
-//        // 执行推理过程，分析章节要求并制定写作计划
+        // 执行推理过程，分析章节要求并制定写作计划
         String reasoningResult;
         PlanRes planRes;
         try {
@@ -545,6 +546,7 @@ public class ChapterContentServiceImpl implements ChapterContentService {
             log.error("[Reasoning] 章节分析结果为空");
             throw new RuntimeException("分析章节要求失败：结果为空");
         }
+        
         // 将reasoningRes保存到数据库
         // 第二阶段：Acting - 根据分析结果执行写作
         log.info("[Acting] 开始根据分析结果生成章节内容");
@@ -553,24 +555,39 @@ public class ChapterContentServiceImpl implements ChapterContentService {
             log.error("[Acting] 章节计划列表为空");
             throw new RuntimeException("生成章节内容失败：计划列表为空");
         }
-        // 生成章节内容
-        WritingAgent writingAgent = new WritingAgent();
-        planList.forEach(e -> {
-//            writingAgent.run(e, planId, request);
-//            run(e, planId, request);
-        });
-        // 构建执行提示词，将推理结果融入提示中 - 使用PromptService
-        List<Message> actingMessages = promptService.buildActingPrompt(request, planRes.toString());
-
-        // 调用AI模型生成实际章节内容
-        log.info("[Acting] 正在以流式方式生成章节内容");
-        Flux<String> contentFlux = llmService.getAgentChatClient(request.getChapterId() + "").getChatClient()
-                .prompt(new Prompt(actingMessages)).stream().content();
-
+        
+        // 使用WritingAgent执行写作计划
+        log.info("[Acting] 使用ReAct方式生成章节内容，计划步骤数: {}", planList.size());
+        WritingAgent writingAgent = new WritingAgent(this.llmService);
+        writingAgent.setPlanId(planId);
+        
+        // 使用Flux合并所有步骤的内容
+        List<Flux<String>> stepFluxes = new ArrayList<>();
+        for (String planStep : planList) {
+            log.info("[Acting] 执行写作计划步骤: {}", planStep);
+            Flux<String> stepFlux = writingAgent.run(planStep, planId, request);
+            stepFluxes.add(stepFlux);
+        }
+        
+        // 合并所有步骤的Flux
+        Flux<String> contentFlux = null;
+        for (Flux<String> stepFlux : stepFluxes) {
+            if (contentFlux == null) {
+                contentFlux = stepFlux;
+            } else {
+                contentFlux = contentFlux.concatWith(stepFlux);
+            }
+        }
+        
+        // 如果没有内容，返回空的Flux
+        if (contentFlux == null) {
+            contentFlux = Flux.empty();
+        }
+        
         // 计算生成耗时
         long endTime = System.currentTimeMillis();
         long duration = endTime - startTime;
-        log.info("[Acting] 流式内容生成准备阶段总耗时: {}ms", duration);
+        log.info("[Acting] 章节内容生成总耗时: {}ms", duration);
 
         return contentFlux;
     }
