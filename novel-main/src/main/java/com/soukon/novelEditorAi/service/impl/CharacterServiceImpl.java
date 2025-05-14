@@ -115,9 +115,9 @@ public class CharacterServiceImpl extends ServiceImpl<CharacterMapper, Character
     }
     
     /**
-     * 使用LLM生成角色信息
+     * 使用LLM创建全新的角色
      *
-     * @param partialCharacter 部分填写的角色信息，至少需要指定项目ID
+     * @param partialCharacter 用户提供的部分角色信息，至少需要指定项目ID
      * @return 完整的角色信息
      */
     @Override
@@ -141,12 +141,13 @@ public class CharacterServiceImpl extends ServiceImpl<CharacterMapper, Character
         // 系统提示词
         String systemPrompt = """
                 你是一个专业的小说角色设计助手，擅长创建丰富、有深度且合理的角色。
-                请根据提供的信息，为小说创建一个完整的角色描述。如果用户已经提供了部分信息，请保留这些信息并补充其余部分。
+                
+                重要说明：用户将提供小说信息和部分角色信息，你的任务是根据这些信息创建一个全新的完整角色，而不是补充已有角色信息。
                 
                 你需要返回一个完整的角色描述，包括以下字段的JSON格式：
-                1. name: 角色名称
-                2. description: 角色简短描述
-                3. role: 角色类型 (protagonist, antagonist, supporting)
+                1. name: 角色名称（如果用户未提供，请创建一个符合小说风格和设定的合适名字）
+                2. description: 角色简短描述（保留用户提供的描述，如果有）
+                3. role: 角色类型 (主角, 配角, 反派，等等)
                 4. gender: 性别
                 5. age: 年龄（数字）
                 6. personality: 性格特征（数组格式，例如["勇敢", "正直", "固执"]）
@@ -160,7 +161,7 @@ public class CharacterServiceImpl extends ServiceImpl<CharacterMapper, Character
                 {
                   "name": "角色名",
                   "description": "角色描述",
-                  "role": "protagonist",
+                  "role": "角色类型",
                   "gender": "男",
                   "age": 25,
                   "personality": ["性格特征1", "性格特征2"],
@@ -185,18 +186,23 @@ public class CharacterServiceImpl extends ServiceImpl<CharacterMapper, Character
             userPromptBuilder.append("目标受众: ").append(project.getTargetAudience()).append("\n");
         }
         
-        // 已有角色信息
+        // 已有角色信息（仅作为参考，而不是要补充的内容）
         if (!existingCharacters.isEmpty()) {
-            userPromptBuilder.append("\n## 已有角色\n");
+            userPromptBuilder.append("\n## 已有角色（仅供参考，创建新角色时需避免重复或冲突）\n");
             for (Character character : existingCharacters) {
                 userPromptBuilder.append(toPrompt(character));
             }
         }
         
-        // 部分角色信息（用户输入）
-        userPromptBuilder.append("\n## 需要补全的角色信息\n");
-        if (partialCharacter.getName() != null && !partialCharacter.getName().isEmpty()) {
+        // 判断是否提供了角色名称
+        boolean hasProvidedName = partialCharacter.getName() != null && !partialCharacter.getName().trim().isEmpty();
+        
+        // 部分角色信息（用户输入）- 这些是新角色的基础信息
+        userPromptBuilder.append("\n## 用户提供的新角色基础信息（请基于这些信息创建完整角色）\n");
+        if (hasProvidedName) {
             userPromptBuilder.append("名称: ").append(partialCharacter.getName()).append("\n");
+        } else {
+            userPromptBuilder.append("名称: [需要创建一个符合小说风格的角色名]\n");
         }
         if (partialCharacter.getDescription() != null && !partialCharacter.getDescription().isEmpty()) {
             userPromptBuilder.append("描述: ").append(partialCharacter.getDescription()).append("\n");
@@ -223,22 +229,33 @@ public class CharacterServiceImpl extends ServiceImpl<CharacterMapper, Character
             userPromptBuilder.append("补充信息: ").append(partialCharacter.getNotes()).append("\n");
         }
         
-        userPromptBuilder.append("\n请基于以上信息，创建/补全一个符合这个小说的完整角色。返回JSON格式数据。");
+        // 根据是否提供名称添加特定指令
+        if (hasProvidedName) {
+            userPromptBuilder.append("\n请基于小说信息和用户提供的基础信息，创建一个完整的新角色。确保保留用户已提供的信息，并补充所有缺失的信息。返回完整的JSON格式数据。");
+        } else {
+            userPromptBuilder.append("\n请基于小说信息和用户提供的基础信息，创建一个完整的新角色，包括一个符合小说风格和设定的角色名称。返回完整的JSON格式数据。");
+        }
         
         // 构建消息列表
         List<Message> messages = new ArrayList<>();
         messages.add(new SystemMessage(systemPrompt));
         messages.add(new UserMessage(userPromptBuilder.toString()));
-        log.info("生成角色请求: {}", messages);
+        log.info("生成新角色请求: {}", messages);
         
         try {
             // 发送请求到AI服务
             Prompt prompt = new Prompt(messages);
             String response = chatClient.prompt(prompt).call().content();
-            log.info("生成角色响应: {}", response);
+            log.info("生成新角色响应: {}", response);
             
             // 解析JSON响应
             Character generatedCharacter = parseCharacterFromJson(response);
+            
+            // 检查生成的名称是否有效
+            if (generatedCharacter.getName() == null || generatedCharacter.getName().trim().isEmpty()) {
+                log.warn("AI生成的角色名为空，使用默认名称");
+                generatedCharacter.setName("未命名角色");
+            }
             
             // 保留原始字段，如果它们存在
             if (partialCharacter.getId() != null) {

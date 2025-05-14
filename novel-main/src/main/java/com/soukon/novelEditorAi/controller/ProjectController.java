@@ -1,5 +1,6 @@
 package com.soukon.novelEditorAi.controller;
 
+import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.soukon.novelEditorAi.common.Result;
@@ -93,5 +94,40 @@ public class ProjectController {
         
         projectService.removeById(id);
         return Result.success("Project deleted successfully", null);
+    }
+
+    /**
+     * 保存项目草稿
+     * @param id 项目ID
+     * @param draftJson 草稿JSON数据
+     * @return 更新结果
+     */
+    @PostMapping("/{id}/draft")
+    public Result<Project> saveDraft(@PathVariable("id") Long id, @RequestBody JSONObject draftJson) {
+        try {
+            Project updatedProject = projectService.saveDraft(id, draftJson);
+            return Result.success("Draft saved successfully", updatedProject);
+        } catch (IllegalArgumentException e) {
+            return Result.error(e.getMessage());
+        } catch (Exception e) {
+            return Result.error("Failed to save draft: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 获取项目草稿
+     * @param id 项目ID
+     * @return 项目草稿JSON数据
+     */
+    @GetMapping("/{id}/draft")
+    public Result<JSONObject> getDraft(@PathVariable("id") Long id) {
+        try {
+            JSONObject draft = projectService.getDraft(id);
+            return Result.success(draft);
+        } catch (IllegalArgumentException e) {
+            return Result.error(e.getMessage());
+        } catch (Exception e) {
+            return Result.error("Failed to retrieve draft: " + e.getMessage());
+        }
     }
 } 

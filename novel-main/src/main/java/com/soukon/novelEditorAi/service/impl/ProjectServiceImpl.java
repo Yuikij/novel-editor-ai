@@ -1,5 +1,6 @@
 package com.soukon.novelEditorAi.service.impl;
 
+import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.soukon.novelEditorAi.entities.Project;
 import com.soukon.novelEditorAi.mapper.ProjectMapper;
@@ -7,6 +8,8 @@ import com.soukon.novelEditorAi.service.ProjectService;
 import com.soukon.novelEditorAi.service.WorldService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
 
 @Service
 public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> implements ProjectService {
@@ -69,5 +72,43 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> impl
     public String toPrompt(Long projectId) {
         Project project = getById(projectId);
         return toPrompt(project);
+    }
+
+    /**
+     * 保存项目草稿
+     *
+     * @param projectId 项目ID
+     * @param draft 草稿JSON数据
+     * @return 更新后的项目实体
+     */
+    @Override
+    public Project saveDraft(Long projectId, JSONObject draft) {
+        Project project = getById(projectId);
+        if (project == null) {
+            throw new IllegalArgumentException("Project not found with id: " + projectId);
+        }
+        
+        project.setDraft(draft);
+        project.setUpdatedAt(LocalDateTime.now());
+        updateById(project);
+        
+        return project;
+    }
+    
+    /**
+     * 获取项目草稿
+     *
+     * @param projectId 项目ID
+     * @return 项目草稿JSON数据，如果不存在则返回空JSONObject
+     */
+    @Override
+    public JSONObject getDraft(Long projectId) {
+        Project project = getById(projectId);
+        if (project == null) {
+            throw new IllegalArgumentException("Project not found with id: " + projectId);
+        }
+        
+        JSONObject draft = project.getDraft();
+        return draft != null ? draft : new JSONObject();
     }
 } 

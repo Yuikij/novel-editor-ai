@@ -27,32 +27,8 @@ public class ChapterContentRequest {
      * 章节上下文
      */
     private ChapterContext chapterContext;
-    
-    /**
-     * 章节标题
-     */
-    private String chapterTitle;
-    
-    /**
-     * 生成提示词
-     */
-    private String prompt;
-    
-    /**
-     * 章节大纲
-     */
-    private String chapterOutline;
-    
-    /**
-     * 章节已有内容（用于续写）
-     */
-    private String existingContent;
-    
-    /**
-     * 场景列表
-     */
-    private List<String> scenes;
-    
+
+
     /**
      * 最大生成Token数
      */
@@ -62,16 +38,7 @@ public class ChapterContentRequest {
      * 温度参数 (0.0-1.0)
      */
     private Float temperature;
-    
-    /**
-     * 是否流式生成
-     */
-    private Boolean streamGeneration;
-    
-    /**
-     * 是否为追加模式 (true: 将生成的内容追加到已有内容后; false: 覆盖已有内容)
-     */
-    private Boolean appendMode;
+
     
     /**
      * 提示建议（如：写作风格、情感基调等建议）

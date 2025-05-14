@@ -24,10 +24,10 @@ public interface CharacterService extends IService<Character> {
      String toPrompt(Long projectId);
      
     /**
-     * 使用LLM生成角色信息
+     * 使用LLM创建全新的角色
      *
-     * @param partialCharacter 部分填写的角色信息，至少需要指定项目ID
-     * @return 完整的角色信息
+     * @param partialCharacter 用户提供的部分角色信息，至少需要指定项目ID。如果不提供名称，LLM将自动创建合适的角色名
+     * @return 创建的完整新角色信息
      */
     Character generateCharacter(Character partialCharacter);
 } 

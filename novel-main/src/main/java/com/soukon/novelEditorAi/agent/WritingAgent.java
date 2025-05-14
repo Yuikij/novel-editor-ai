@@ -18,6 +18,7 @@ package com.soukon.novelEditorAi.agent;
 import com.soukon.novelEditorAi.llm.LlmService;
 import com.soukon.novelEditorAi.model.chapter.ChapterContentRequest;
 import com.soukon.novelEditorAi.model.chapter.PlanContext;
+import lombok.Data;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.messages.AssistantMessage.ToolCall;
@@ -50,24 +51,28 @@ import static org.springframework.ai.chat.client.advisor.AbstractChatMemoryAdvis
 public class WritingAgent extends ReActAgent {
 
 
-
-
     private static final Logger log = LoggerFactory.getLogger(WritingAgent.class);
 
     private final String reactSystemPrompt = """
             你是一个专业小说写作助手，使用ReAct（思考+行动）模式工作，严格遵循以下流程：
-            
+                        
             1. 思考：分析当前写作步骤，提出相关问题并给出简短回答
             2. 行动：基于思考结果，创作对应的小说内容
             3. 评估：判断是否达到终止条件，决定继续或结束
-            
+                        
             每个步骤要有明确的标记和格式。
             """;
+
+    @Data
+    public class ThinkRes {
+        private String question;
+        private String answer;
+    }
 
     private final String thinkPromptTemplate = """
             思考：
             你正在执行写作计划中的第{stepNumber}步：{stepContent}。
-            
+           
             在开始写作前，进行结构化思考：
             1. 自动生成3个与此步骤相关的问题，考虑以下方面：
                - 场景的氛围、感官细节或设定。
@@ -84,6 +89,10 @@ public class WritingAgent extends ReActAgent {
               - 回答：{简短回答}
             
             确保问题和回答与上下文和步骤目标一致，为后续写作提供清晰的指导。
+            
+            注意：如果你认为该步骤已经完成，则不需要输出问题。
+            
+            输出的格式为：{format}
             """;
 
     private final String actionPromptTemplate = """
@@ -96,7 +105,7 @@ public class WritingAgent extends ReActAgent {
             - 保持与上下文的连贯性，特别是上一段内容：{previousContent}。
             - 字数限制为{wordCount}字。
             - 融入符合角色性格和情节发展的细节，必要时添加创意元素以增强叙事。
-            
+           
             现在撰写文本。
             """;
 
@@ -115,7 +124,7 @@ public class WritingAgent extends ReActAgent {
     private ToolCallbackProvider toolCallbackProvider;
     private ChatResponse response;
     private Prompt userPrompt;
-    
+
     private String planId;
     private int currentStepNumber = 1;
     private List<String> planSteps = new ArrayList<>();
@@ -127,7 +136,7 @@ public class WritingAgent extends ReActAgent {
     private ChapterContentRequest request;
     private Map<String, Object> stepData = new HashMap<>();
 
-    
+
     public WritingAgent(LlmService llmService, ChapterContentRequest request) {
         super(llmService, request);
     }
@@ -163,7 +172,7 @@ public class WritingAgent extends ReActAgent {
 
         return Flux.fromIterable(contentPieces);
     }
-    
+
     private AgentExecResult executeWritingStep(int stepNumber) {
         try {
             // 准备当前步骤数据
@@ -174,40 +183,40 @@ public class WritingAgent extends ReActAgent {
             stepData.put("mood", mood);
             stepData.put("wordCount", "150-300");
             stepData.put("targetWordCount", String.valueOf(targetWordCount));
-            
+
             // 执行思考阶段
             String thoughtResult = executeThinkPhase();
             log.debug("思考阶段结果: {}", thoughtResult);
-            
+
             // 执行行动阶段
             String actionResult = executeActionPhase();
             log.debug("行动阶段结果: {}", actionResult);
-            
+
             // 更新上下文
             currentWordCount += actionResult.length();
             previousContent = getLastParagraph(actionResult);
             generatedContent.append(actionResult).append("\n\n");
-            
+
             // 判断是否需要终止
-            boolean shouldTerminate = currentStepNumber >= planSteps.size() || 
-                                     currentWordCount >= targetWordCount;
-            
+            boolean shouldTerminate = currentStepNumber >= planSteps.size() ||
+                                      currentWordCount >= targetWordCount;
+
             if (shouldTerminate) {
                 return new AgentExecResult(actionResult, AgentState.COMPLETED);
             } else {
                 return new AgentExecResult(actionResult, AgentState.IN_PROGRESS);
             }
-            
+
         } catch (Exception e) {
             log.error("写作步骤执行失败: {}", e.getMessage(), e);
             return new AgentExecResult("写作执行失败: " + e.getMessage(), AgentState.FAILED);
         }
     }
-    
+
     private String executeThinkPhase() {
         PromptTemplate promptTemplate = new PromptTemplate(thinkPromptTemplate);
         Message thinkMessage = promptTemplate.createMessage(stepData);
-        
+
         // 调用LLM生成思考结果
         Prompt prompt = new Prompt(List.of(thinkMessage));
         String result = llmService.getAgentChatClient(planId)
@@ -215,14 +224,14 @@ public class WritingAgent extends ReActAgent {
                 .prompt(prompt)
                 .call()
                 .content();
-                
+
         return result;
     }
-    
+
     private String executeActionPhase() {
         PromptTemplate promptTemplate = new PromptTemplate(actionPromptTemplate);
         Message actionMessage = promptTemplate.createMessage(stepData);
-        
+
         // 调用LLM生成行动结果
         Prompt prompt = new Prompt(List.of(actionMessage));
         Flux<String> result = llmService.getAgentChatClient(planId)
@@ -234,12 +243,12 @@ public class WritingAgent extends ReActAgent {
         planContext.setPlanStream(result);
         return "";
     }
-    
+
     private String getLastParagraph(String text) {
         if (text == null || text.isEmpty()) {
             return "无前文";
         }
-        
+
         String[] paragraphs = text.split("\n\n");
         if (paragraphs.length > 0) {
             String lastParagraph = paragraphs[paragraphs.length - 1].trim();
@@ -249,12 +258,17 @@ public class WritingAgent extends ReActAgent {
             }
             return lastParagraph;
         }
-        
+
         return text.length() > 100 ? "..." + text.substring(text.length() - 100) : text;
     }
 
     @Override
     protected boolean think() {
+
+        chapterContentRequest.getPlanContext();
+        String content = llmService.getAgentChatClient(planId)
+                .getChatClient()
+                .prompt("").call().content();
 
         return false;
     }
@@ -262,6 +276,11 @@ public class WritingAgent extends ReActAgent {
     @Override
     protected AgentExecResult act() {
         // 这个方法由父类ReActAgent调用，但我们使用自己的执行流程
+        Flux<String> content = llmService.getAgentChatClient(planId)
+                .getChatClient()
+                .prompt("").stream().content();
+        this.chapterContentRequest.getPlanContext().setPlanStream(content);
+
         return new AgentExecResult("Not implemented", AgentState.FAILED);
     }
 
@@ -283,19 +302,21 @@ public class WritingAgent extends ReActAgent {
     @Override
     protected Message addThinkPrompt(List<Message> messages) {
         SystemPromptTemplate promptTemplate = new SystemPromptTemplate(reactSystemPrompt);
-        Message systemMessage = promptTemplate.createMessage(getData());
+        Message systemMessage = promptTemplate.createMessage();
         messages.add(systemMessage);
         return systemMessage;
     }
 
-    public void addEnvData(String key, String value) {
-        Map<String, Object> data = super.getData();
-        if (data == null) {
-            throw new IllegalStateException("Data map is null. Cannot add environment data.");
-        }
-        data.put(key, value);
-    }
-    
+//    public void addEnvData(String key, String value) {
+//        Map<String, Object> data = super.getData();
+//        if (data == null) {
+//            throw new IllegalStateException("Data map is null. Cannot add environment data.");
+//        }
+//        data.put(key, value);
+//    }
+//
+
+
     public String getPlanId() {
         return this.planId;
     }

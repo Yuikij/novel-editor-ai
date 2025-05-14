@@ -1,5 +1,6 @@
 package com.soukon.novelEditorAi.entities;
 
+import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -37,8 +38,11 @@ public class Project {
     
     @TableField(typeHandler = JacksonTypeHandler.class)
     private List<String> writingRequirements;
+
+    @TableField(typeHandler = JacksonTypeHandler.class)
+    private JSONObject draft;
     
-    private String status; // Enum: 'draft', 'in-progress', 'completed', 'published'
+    private String status;
     private Long worldId;
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdAt;
