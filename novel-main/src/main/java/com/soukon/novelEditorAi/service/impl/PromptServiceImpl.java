@@ -1,6 +1,7 @@
 package com.soukon.novelEditorAi.service.impl;
 
 import com.soukon.novelEditorAi.entities.Chapter;
+import com.soukon.novelEditorAi.entities.Plot;
 import com.soukon.novelEditorAi.entities.Project;
 import com.soukon.novelEditorAi.model.chapter.ChapterContentRequest;
 import com.soukon.novelEditorAi.model.chapter.ChapterContext;
@@ -101,6 +102,8 @@ public class PromptServiceImpl implements PromptService {
 
         extracted(request, userPromptBuilder, context);
 
+        // 添加情节信息
+
         // 构建消息列表
         List<Message> messages = new ArrayList<>();
         messages.add(new SystemMessage(systemPrompt));
@@ -177,15 +180,14 @@ public class PromptServiceImpl implements PromptService {
         }
 
         //  第四部分  需要创作或续写章节包含的情节信息，包括情节的概述和情节的完成情况
-        userPromptBuilder.append("## 4. 需要创作或续写章节包含的情节信息\n");
-        if (context.getChapterPlots() != null && !context.getChapterPlots().isEmpty()) {
-            userPromptBuilder.append("### 本章节需要包含的情节\n");
-            context.getChapterPlots().forEach(plot -> userPromptBuilder.append(plotService.toPrompt(plot)));
-            userPromptBuilder.append("\n");
-        }else{
-
-            userPromptBuilder.append("已有情节为空\n");
-        }
+//        userPromptBuilder.append("## 4. 需要创作或续写章节包含的情节信息\n");
+//        if (context.getChapterPlots() != null && !context.getChapterPlots().isEmpty()) {
+//            userPromptBuilder.append("### 本章节需要包含的情节\n");
+//            context.getChapterPlots().forEach(plot -> userPromptBuilder.append(plotService.toPrompt(plot)));
+//            userPromptBuilder.append("\n");
+//        }else{
+//            userPromptBuilder.append("已有情节为空\n");
+//        }
 
         // 已有内容
         if (currentChapter != null && currentChapter.getContent() != null && !currentChapter.getContent().isEmpty()) {
@@ -205,6 +207,15 @@ public class PromptServiceImpl implements PromptService {
         String relevantInfo = retrieveRelevantInfo(context.getCurrentChapter().getId());
         if (relevantInfo != null && !relevantInfo.isEmpty()) {
             userPromptBuilder.append("### 相关背景信息\n").append(relevantInfo).append("\n");
+        }
+
+        Plot firstIncompletePlot = plotService.getFirstIncompletePlot(context.getCurrentChapter().getId());
+        if (firstIncompletePlot != null) {
+            userPromptBuilder.append("### 需要创作的情节\n");
+            userPromptBuilder.append(plotService.toPrompt(firstIncompletePlot));
+            userPromptBuilder.append("\n");
+        } else {
+            userPromptBuilder.append("没有需要创作的情节\n");
         }
     }
 

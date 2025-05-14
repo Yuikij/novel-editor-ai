@@ -18,6 +18,7 @@ package com.soukon.novelEditorAi.agent;
 import com.soukon.novelEditorAi.llm.LlmService;
 import com.soukon.novelEditorAi.model.chapter.ChapterContentRequest;
 import com.soukon.novelEditorAi.model.chapter.PlanContext;
+import com.soukon.novelEditorAi.model.chapter.PlanRes;
 import lombok.Data;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,6 +31,7 @@ import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.chat.prompt.SystemPromptTemplate;
+import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.model.tool.ToolExecutionResult;
@@ -61,25 +63,38 @@ public class WritingAgent extends ReActAgent {
             3. 评估：判断是否达到终止条件，决定继续或结束
                         
             每个步骤要有明确的标记和格式。
+            
+            全局计划完成情节：
+            todo 1
+            全局步骤计划:
+            todo 2
+            
             """;
 
     @Data
     public class ThinkRes {
+        private List<QuestionRes> questions;
+        private boolean isCompleted;
+    }
+
+    @Data
+    public class QuestionRes {
         private String question;
         private String answer;
     }
 
     private final String thinkPromptTemplate = """
+            
             思考：
             你正在执行写作计划中的第{stepNumber}步：{stepContent}。
-           
+                       
             在开始写作前，进行结构化思考：
             1. 自动生成3个与此步骤相关的问题，考虑以下方面：
                - 场景的氛围、感官细节或设定。
                - 角色的情绪、动机或行为。
                - 叙事的节奏、语气或情节推进。
             2. 为每个问题提供简短的回答（每回答50字以内）。
-            
+                        
             输出格式：
             - 问题1：{生成的问题}
               - 回答：{简短回答}
@@ -87,45 +102,46 @@ public class WritingAgent extends ReActAgent {
               - 回答：{简短回答}
             - 问题3：{生成的问题}
               - 回答：{简短回答}
-            
+                        
             确保问题和回答与上下文和步骤目标一致，为后续写作提供清晰的指导。
-            
+                        
             注意：如果你认为该步骤已经完成，则不需要输出问题。
-            
+                        
             输出的格式为：{format}
             """;
 
     private final String actionPromptTemplate = """
             行动：
-            
+                        
             根据你的思考结果，执行写作计划中的第{stepNumber}步：{stepContent}。
-            
+                        
             写作指南：
             - 使用生动、具体的语言，营造{mood}的氛围。
             - 保持与上下文的连贯性，特别是上一段内容：{previousContent}。
             - 字数限制为{wordCount}字。
             - 融入符合角色性格和情节发展的细节，必要时添加创意元素以增强叙事。
-           
+                       
             现在撰写文本。
             """;
 
     private final String evaluatePromptTemplate = """
-            
+                        
             完成当前步骤后，返回写作计划并执行下一步。
-            
+                        
             终止条件：
             - 计划中的所有步骤均已完成，或
             - 总字数达到{targetWordCount}字，或
             - 上下文表明章节或场景已自然结束（例如，达到情节高潮或转折点）。
-            
+                        
             如果继续，简要说明下一步的重点；如果停止，说明原因并总结已完成的内容。
             """;
 
+    private BeanOutputConverter<ThinkRes> converter = new BeanOutputConverter<>(ThinkRes.class);
     private ToolCallbackProvider toolCallbackProvider;
     private ChatResponse response;
     private Prompt userPrompt;
 
-    private String planId;
+
     private int currentStepNumber = 1;
     private List<String> planSteps = new ArrayList<>();
     private int currentWordCount = 0;
@@ -264,12 +280,22 @@ public class WritingAgent extends ReActAgent {
 
     @Override
     protected boolean think() {
+        try {
+            PromptTemplate promptTemplate = new PromptTemplate(thinkPromptTemplate);
+            this.stepData.put("format", converter.getFormat());
+            Message thinkMessage = promptTemplate.createMessage(this.stepData);
 
-        chapterContentRequest.getPlanContext();
-        String content = llmService.getAgentChatClient(planId)
-                .getChatClient()
-                .prompt("").call().content();
+            String content = llmService.getAgentChatClient(planId)
+                    .getChatClient()
+                    .prompt(new Prompt(List.of(thinkMessage))).call().content();
+            ThinkRes convert = converter.convert(content);
+            if (convert != null && convert.getQuestions() != null && !convert.getQuestions().isEmpty() && !convert.isCompleted()) {
+                return true;
+            }
 
+        } catch (Exception e) {
+            log.error("思考阶段执行失败: {}", e.getMessage(), e);
+        }
         return false;
     }
 
@@ -278,10 +304,20 @@ public class WritingAgent extends ReActAgent {
         // 这个方法由父类ReActAgent调用，但我们使用自己的执行流程
         Flux<String> content = llmService.getAgentChatClient(planId)
                 .getChatClient()
-                .prompt("").stream().content();
-        this.chapterContentRequest.getPlanContext().setPlanStream(content);
+                .prompt(actionPromptTemplate).stream().content();
 
-        return new AgentExecResult("Not implemented", AgentState.FAILED);
+        // 创建一个StringBuilder来收集完整内容
+        StringBuilder fullContent = new StringBuilder();
+        // 使用doOnNext收集内容，但不影响原始流
+        Flux<String> modifiedContent = content.doOnNext(chunk -> {
+            fullContent.append(chunk);
+        }).doOnComplete(() -> {
+            // 流完成后，将完整内容传给think方法
+            llmService.getAgentChatClient(getPlanId()).getMemory().add(getPlanId(), new UserMessage(fullContent.toString()));
+        });
+
+        this.chapterContentRequest.getPlanContext().setPlanStream(modifiedContent);
+        return new AgentExecResult("Content generation started", AgentState.IN_PROGRESS);
     }
 
     @Override

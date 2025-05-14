@@ -61,7 +61,7 @@ public abstract class BaseAgent {
 
     private static final Logger log = LoggerFactory.getLogger(BaseAgent.class);
 
-    private String planId = null;
+    String planId = null;
 
     private AgentState state = AgentState.NOT_STARTED;
 
@@ -74,7 +74,7 @@ public abstract class BaseAgent {
 
     protected ChapterContentRequest chapterContentRequest;
 
-    private String stepData;
+    private  Map<String, Object> stepData;
 
     /**
      * 获取智能体的名称
@@ -164,9 +164,10 @@ public abstract class BaseAgent {
         this.llmService = llmService;
         this.maxSteps = 5;
         this.chapterContentRequest = request;
+        this.planId = request.getPlanContext().getPlanId();
     }
 
-    public void run(String stepData) {
+    public void run( Map<String, Object> stepData) {
         currentStep = 0;
         this.stepData = stepData;
         if (state != AgentState.IN_PROGRESS) {

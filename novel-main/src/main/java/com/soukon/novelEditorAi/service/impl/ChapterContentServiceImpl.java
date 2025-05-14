@@ -1,6 +1,7 @@
 package com.soukon.novelEditorAi.service.impl;
 
 import com.alibaba.nacos.common.utils.UuidUtils;
+import com.soukon.novelEditorAi.agent.AgentState;
 import com.soukon.novelEditorAi.agent.WritingAgent;
 import com.soukon.novelEditorAi.common.Result;
 import com.soukon.novelEditorAi.entities.Chapter;
@@ -43,6 +44,7 @@ import org.springframework.context.annotation.Lazy;
 
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.time.LocalDateTime;
 import java.util.concurrent.ConcurrentHashMap;
@@ -205,7 +207,7 @@ public class ChapterContentServiceImpl implements ChapterContentService {
     @Override
     public Result<String> generateChapterContentExecute(ChapterContentRequest request) {
         String planId = UuidUtils.generateUuid();
-        
+
         // 创建新的计划上下文
         PlanContext planContext = new PlanContext(planId);
         planContext.setPlanState(PlanState.PLANNING);
@@ -220,8 +222,7 @@ public class ChapterContentServiceImpl implements ChapterContentService {
                 generateChapterContentStreamFlux(request);
                 // 更新计划状态
                 planContext.setPlanState(PlanState.COMPLETED);
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 log.error("执行计划失败", e);
                 planContext.setPlanState(PlanState.COMPLETED);  // 即使失败也标记为完成
                 throw new RuntimeException("执行计划失败: " + e.getMessage(), e);
@@ -374,7 +375,7 @@ public class ChapterContentServiceImpl implements ChapterContentService {
             log.error("[Reasoning] 章节分析结果为空");
             throw new RuntimeException("分析章节要求失败：结果为空");
         }
-        
+
         // 将reasoningRes保存到数据库
         // 第二阶段：Acting - 根据分析结果执行写作
         log.info("[Acting] 开始根据分析结果生成章节内容");
@@ -383,16 +384,21 @@ public class ChapterContentServiceImpl implements ChapterContentService {
             log.error("[Acting] 章节计划列表为空");
             throw new RuntimeException("生成章节内容失败：计划列表为空");
         }
-        
+
         // 使用WritingAgent执行写作计划
         log.info("[Acting] 使用ReAct方式生成章节内容，计划步骤数: {}", planList.size());
-        WritingAgent writingAgent = new WritingAgent(this.llmService,  request);
+        WritingAgent writingAgent = new WritingAgent(this.llmService, request);
         writingAgent.setPlanId(planId);
-        
         // 使用Flux合并所有步骤的内容
+        int index = 1;
         for (String planStep : planList) {
             log.info("[Acting] 执行写作计划步骤: {}", planStep);
-            writingAgent.run(planStep);
+            writingAgent.setState(AgentState.IN_PROGRESS);
+            Map<String, Object> executorParams = new HashMap<>();
+            executorParams.put("stepContent", planStep);
+            executorParams.put("stepNumber", index++);
+            writingAgent.run(executorParams);
+
         }
 
     }

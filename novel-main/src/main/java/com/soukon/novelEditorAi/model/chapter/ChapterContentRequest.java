@@ -28,6 +28,15 @@ public class ChapterContentRequest {
      */
     private ChapterContext chapterContext;
 
+    /**
+     * 上下文
+     */
+    private String context;
+
+    /**
+     * 目标
+     */
+    private String globalContext;
 
     /**
      * 最大生成Token数
