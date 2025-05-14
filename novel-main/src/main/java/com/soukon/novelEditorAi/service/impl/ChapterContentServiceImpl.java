@@ -55,6 +55,8 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.soukon.novelEditorAi.model.chapter.ReasoningRes;
 import org.springframework.ai.converter.BeanOutputConverter;
 
+import static com.soukon.novelEditorAi.model.chapter.PlanState.IN_PROGRESS;
+
 /**
  * 章节内容服务实现类
  * 负责章节内容的生成、保存和检索
@@ -217,7 +219,7 @@ public class ChapterContentServiceImpl implements ChapterContentService {
         // 异步执行任务
         CompletableFuture.runAsync(() -> {
             try {
-                planContext.setPlanState(PlanState.IN_PROGRESS);
+                planContext.setPlanState(PlanState.PLANNING);
                 // 生成内容
                 generateChapterContentStreamFlux(request);
                 // 更新计划状态
@@ -363,7 +365,7 @@ public class ChapterContentServiceImpl implements ChapterContentService {
             BeanOutputConverter<PlanRes> converter = new BeanOutputConverter<>(PlanRes.class);
             log.info("[Reasoning] 正在分析章节要求并制定写作计划");
 
-            reasoningResult = llmService.getAgentChatClient(request.getChapterId() + "").getChatClient()
+            reasoningResult = llmService.getAgentChatClient(request.getPlanContext().getPlanId()).getChatClient()
                     .prompt(new Prompt(reasoningMessages)).call().content();
             planRes = reasoningResult == null ? null : converter.convert(reasoningResult);
             log.info("[Reasoning] 完成章节分析和写作计划: {}", planRes);
@@ -378,28 +380,29 @@ public class ChapterContentServiceImpl implements ChapterContentService {
 
         // 将reasoningRes保存到数据库
         // 第二阶段：Acting - 根据分析结果执行写作
-        log.info("[Acting] 开始根据分析结果生成章节内容");
+        log.info("[Planing] 开始根据分析结果生成章节内容");
         List<String> planList = planRes.getPlanList();
         if (planList == null || planList.isEmpty()) {
-            log.error("[Acting] 章节计划列表为空");
+            log.error("[Planing] 章节计划列表为空");
             throw new RuntimeException("生成章节内容失败：计划列表为空");
         }
 
         // 使用WritingAgent执行写作计划
-        log.info("[Acting] 使用ReAct方式生成章节内容，计划步骤数: {}", planList.size());
+        log.info("[Planing] 使用ReAct方式生成章节内容，计划步骤数: {}", planList.size());
         WritingAgent writingAgent = new WritingAgent(this.llmService, request);
         writingAgent.setPlanId(planId);
+        request.getPlanContext().setPlanState(PlanState.IN_PROGRESS);
+        request.setPlan(planRes.toString());
         // 使用Flux合并所有步骤的内容
         int index = 1;
         for (String planStep : planList) {
-            log.info("[Acting] 执行写作计划步骤: {}", planStep);
+            log.info("[Planing] 执行写作计划步骤: {}", planStep);
             writingAgent.setState(AgentState.IN_PROGRESS);
             Map<String, Object> executorParams = new HashMap<>();
             executorParams.put("stepContent", planStep);
             executorParams.put("stepNumber", index++);
             writingAgent.run(executorParams);
-
         }
-
+        llmService.removeAgentChatClient(planId);
     }
 } 

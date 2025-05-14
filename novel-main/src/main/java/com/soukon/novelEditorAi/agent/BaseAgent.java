@@ -74,7 +74,7 @@ public abstract class BaseAgent {
 
     protected ChapterContentRequest chapterContentRequest;
 
-    private  Map<String, Object> stepData;
+    Map<String, Object> stepData;
 
     /**
      * 获取智能体的名称
@@ -184,7 +184,7 @@ public abstract class BaseAgent {
             throw e; // 重新抛出异常，让上层调用者知道发生了错误
         } finally {
             state = AgentState.COMPLETED; // Reset state after execution
-            llmService.removeAgentChatClient(planId);
+
         }
     }
 

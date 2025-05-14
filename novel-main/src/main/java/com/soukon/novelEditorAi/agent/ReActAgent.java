@@ -30,8 +30,7 @@ public abstract class ReActAgent extends BaseAgent {
 	/**
 	 * 构造函数
 	 * @param llmService LLM服务实例，用于处理自然语言交互
-	 * @param planExecutionRecorder 计划执行记录器，用于记录执行过程
-	 * @param manusProperties Manus配置属性
+
 	 */
 	public ReActAgent(LlmService llmService, ChapterContentRequest request) {
 		super(llmService,request);

@@ -28,13 +28,20 @@ public class ChapterContentRequest {
      */
     private ChapterContext chapterContext;
 
+
     /**
      * 上下文
      */
     private String context;
 
+
     /**
-     * 目标
+     * 总计划
+     */
+    private String plan;
+
+    /**
+     * 目标情节
      */
     private String globalContext;
 

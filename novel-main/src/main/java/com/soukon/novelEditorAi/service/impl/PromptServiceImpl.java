@@ -66,9 +66,9 @@ public class PromptServiceImpl implements PromptService {
      */
     @Override
     public List<Message> buildReasoningPrompt(ChapterContentRequest request) {
-        ChapterContext context = request.getChapterContext();
+        ChapterContext chapterContext = request.getChapterContext();
 
-        if (context == null) {
+        if (chapterContext == null) {
             throw new IllegalStateException("章节上下文未构建");
         }
         BeanOutputConverter<PlanRes> converter = new BeanOutputConverter<>(PlanRes.class);
@@ -100,7 +100,22 @@ public class PromptServiceImpl implements PromptService {
         StringBuilder userPromptBuilder = new StringBuilder();
         userPromptBuilder.append("请根据以下上下文信息，分析并创作符合要求的写作计划：\n\n");
 
-        extracted(request, userPromptBuilder, context);
+        String context = extracted(request, chapterContext);
+
+        userPromptBuilder.append(context);
+
+        request.setContext(context);
+
+        Plot firstIncompletePlot = plotService.getFirstIncompletePlot(chapterContext.getCurrentChapter().getId());
+        if (firstIncompletePlot != null) {
+            userPromptBuilder.append("### 需要创作的情节\n");
+            String globalContext = plotService.toPrompt(firstIncompletePlot);
+            request.setGlobalContext(globalContext);
+            userPromptBuilder.append(globalContext);
+            userPromptBuilder.append("\n");
+        } else {
+            userPromptBuilder.append("没有需要创作的情节\n");
+        }
 
         // 添加情节信息
 
@@ -115,19 +130,15 @@ public class PromptServiceImpl implements PromptService {
         return messages;
     }
 
-    private void extracted(ChapterContentRequest request, StringBuilder userPromptBuilder, ChapterContext context) {
+    private String extracted(ChapterContentRequest request, ChapterContext context) {
+
+        StringBuilder userPromptBuilder = new StringBuilder();
         // 第一部分：小说元数据
         userPromptBuilder.append("## 1. 小说元数据\n");
 
         // 项目信息
         if (context.getProject() != null) {
             userPromptBuilder.append(projectService.toPrompt(context.getProject())).append("\n");
-        }
-
-        // 世界观信息
-        if (context.getWorld() != null) {
-            userPromptBuilder.append("### 世界观信息\n");
-            userPromptBuilder.append(worldService.toPrompt(context.getWorld())).append("\n");
         }
 
         // 角色信息
@@ -208,15 +219,7 @@ public class PromptServiceImpl implements PromptService {
         if (relevantInfo != null && !relevantInfo.isEmpty()) {
             userPromptBuilder.append("### 相关背景信息\n").append(relevantInfo).append("\n");
         }
-
-        Plot firstIncompletePlot = plotService.getFirstIncompletePlot(context.getCurrentChapter().getId());
-        if (firstIncompletePlot != null) {
-            userPromptBuilder.append("### 需要创作的情节\n");
-            userPromptBuilder.append(plotService.toPrompt(firstIncompletePlot));
-            userPromptBuilder.append("\n");
-        } else {
-            userPromptBuilder.append("没有需要创作的情节\n");
-        }
+        return userPromptBuilder.toString();
     }
 
     /**
