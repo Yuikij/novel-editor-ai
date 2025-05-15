@@ -130,4 +130,40 @@ public class ProjectController {
             return Result.error("Failed to retrieve draft: " + e.getMessage());
         }
     }
+
+
+    /**
+     * 保存项目地图
+     * @param id 项目ID
+     * @param mapJson 草稿JSON数据
+     * @return 更新结果
+     */
+    @PostMapping("/{id}/map")
+    public Result<Project> saveMap(@PathVariable("id") Long id, @RequestBody JSONObject mapJson) {
+        try {
+            Project updatedProject = projectService.saveMap(id, mapJson);
+            return Result.success("map saved successfully", updatedProject);
+        } catch (IllegalArgumentException e) {
+            return Result.error(e.getMessage());
+        } catch (Exception e) {
+            return Result.error("Failed to save map: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 获取项目地图
+     * @param id 项目ID
+     * @return 项目地图SON数据
+     */
+    @GetMapping("/{id}/map")
+    public Result<JSONObject> getMap(@PathVariable("id") Long id) {
+        try {
+            JSONObject map = projectService.getMap(id);
+            return Result.success(map);
+        } catch (IllegalArgumentException e) {
+            return Result.error(e.getMessage());
+        } catch (Exception e) {
+            return Result.error("Failed to retrieve map: " + e.getMessage());
+        }
+    }
 } 

@@ -256,84 +256,8 @@ public class ChapterController {
         if (planContext == null) {
             return Flux.error(new RuntimeException("计划不存在，请检查计划ID是否正确"));
         }
-
-        // 获取计划流
-        Flux<String> planStream = planContext.getPlanStream();
-        if (planStream == null) {
-            // 如果流为空但已有完整内容，则返回完整内容作为单个元素流
-            if (planContext.getCompletedContent() != null && !planContext.getCompletedContent().isEmpty()) {
-                log.info("流已完成，返回缓存的完整内容，计划ID: {}", planId);
-                return Flux.just(planContext.getCompletedContent())
-                    .doOnComplete(() -> {
-                        // 自动通知消费完成
-                        planContext.notifyConsumptionCompleted();
-                        log.info("自动通知内容消费完成，计划ID: {}", planId);
-                    });
-            }
-            return Flux.error(new RuntimeException("计划内容尚未生成或已过期"));
-        }
-
-        // 返回流并在完成时自动通知
-        return planStream
-            .doOnSubscribe(s -> log.info("前端开始消费内容流，计划ID: {}", planId))
-            .doOnComplete(() -> {
-                // 流结束时自动通知完成消费
-                planContext.notifyConsumptionCompleted();
-                log.info("内容流消费完成，自动通知后端，计划ID: {}", planId);
-            })
-            .doOnError(e -> {
-                log.error("内容流消费出错: {}, 计划ID: {}", e.getMessage(), planId, e);
-                // 出错时也通知完成，防止后端一直等待
-                planContext.notifyConsumptionCompleted();
-            })
-            .onErrorResume(e -> {
-                log.error("处理内容流错误: {}, 计划ID: {}", e.getMessage(), planId);
-                return Flux.error(new RuntimeException("内容流处理失败: " + e.getMessage()));
-            });
+        return planContext.getPlanStream();
     }
 
-    /**
-     * 通知后端前端已完成消费
-     */
-    @PostMapping("/generate/content/completed")
-    public ResponseEntity<String> notifyContentConsumed(@RequestParam("planId") String planId) {
-        log.info("前端通知内容已消费完毕，计划ID: {}", planId);
-        
-        // 从章节内容服务中获取计划上下文
-        PlanContext planContext = chapterContentService.getPlanContextMap().get(planId);
-        if (planContext == null) {
-            return ResponseEntity.badRequest().body("计划不存在，请检查计划ID是否正确");
-        }
-        
-        // 通知完成消费
-        planContext.notifyConsumptionCompleted();
-        
-        return ResponseEntity.ok("通知成功");
-    }
 
-    /**
-     * 保存章节内容
-     *
-     * @param chapterId  章节ID
-     * @param content    章节内容
-     * @param appendMode 是否为追加模式（true: 追加到已有内容后; false: 覆盖原有内容）
-     * @return 保存结果
-     */
-    @PostMapping("/save")
-    public Result<Boolean> saveChapterContent(@RequestParam("chapterId") Long chapterId, @RequestParam(value = "appendMode", required = false, defaultValue = "false") Boolean appendMode, @RequestBody String content) {
-
-        log.info("保存章节内容，章节ID: {}, 追加模式: {}", chapterId, appendMode);
-
-        try {
-            boolean success = chapterContentService.saveChapterContent(chapterId, content, appendMode);
-            if (success) {
-                return Result.success(true);
-            } else {
-                return Result.error(404, "保存失败，未找到指定章节");
-            }
-        } catch (Exception e) {
-            log.error("保存章节内容失败: {}", e.getMessage(), e);
-            return Result.error(500, "保存章节内容失败: " + e.getMessage());
-        }
-    }
 } 

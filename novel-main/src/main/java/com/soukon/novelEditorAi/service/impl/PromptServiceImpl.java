@@ -81,6 +81,7 @@ public class PromptServiceImpl implements PromptService {
                 - 明确一个具体的写作任务（如“描写主角进入新场景”或“编写角色间的冲突对话”）。
                 - 与上下文保持一致，推动故事发展。
                 - 具有逻辑性和连贯性。
+                - 在步骤描述之后明确该步骤的计划字数
                 
                 然后给出完成计划之后的情节完成百分比
                 
@@ -91,9 +92,12 @@ public class PromptServiceImpl implements PromptService {
                    - 步骤2：{描述}
                    - 步骤3：{描述}
                    - （根据需要添加更多步骤）
-                
+                3. 完成计划之后的情节完成百分比
                 在制定计划时，优先考虑叙事连贯性、角色发展和情节推进。允许添加符合上下文的创意细节。
-                输出的格式为：{%s}
+                
+                直接输出结构化json格式，不需要额外的任何解释说明！
+                
+                输出的json格式为：{%s}
                 """.formatted(converter.getFormat());
 
         // 用户提示词 - 包含章节上下文信息
@@ -117,7 +121,9 @@ public class PromptServiceImpl implements PromptService {
             userPromptBuilder.append("没有需要创作的情节\n");
         }
 
-        // 添加情节信息
+        // 提示
+
+        userPromptBuilder.append("\n## 直接输出结构化json格式，不需要额外的任何解释说明！\n");
 
         // 构建消息列表
         List<Message> messages = new ArrayList<>();

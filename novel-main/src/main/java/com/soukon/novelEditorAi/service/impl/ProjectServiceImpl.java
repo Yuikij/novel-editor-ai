@@ -94,6 +94,20 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> impl
         
         return project;
     }
+
+    @Override
+    public Project saveMap(Long projectId, JSONObject map) {
+        Project project = getById(projectId);
+        if (project == null) {
+            throw new IllegalArgumentException("Project not found with id: " + projectId);
+        }
+
+        project.setMap(map);
+        project.setUpdatedAt(LocalDateTime.now());
+        updateById(project);
+
+        return project;
+    }
     
     /**
      * 获取项目草稿
@@ -110,5 +124,16 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> impl
         
         JSONObject draft = project.getDraft();
         return draft != null ? draft : new JSONObject();
+    }
+
+    @Override
+    public JSONObject getMap(Long projectId) {
+        Project project = getById(projectId);
+        if (project == null) {
+            throw new IllegalArgumentException("Project not found with id: " + projectId);
+        }
+
+        JSONObject map = project.getMap();
+        return map != null ? map : new JSONObject();
     }
 } 

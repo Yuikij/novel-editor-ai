@@ -33,7 +33,8 @@ public interface ProjectService extends IService<Project> {
      * @return 更新后的项目实体
      */
     Project saveDraft(Long projectId, JSONObject draft);
-    
+    Project saveMap(Long projectId, JSONObject map);
+
     /**
      * 获取项目草稿
      *
@@ -41,4 +42,5 @@ public interface ProjectService extends IService<Project> {
      * @return 项目草稿JSON数据，如果不存在则返回空JSONObject
      */
     JSONObject getDraft(Long projectId);
-} 
+    JSONObject getMap(Long projectId);
+}

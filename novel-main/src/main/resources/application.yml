@@ -17,23 +17,13 @@ spring:
   cloud:
     nacos:
       discovery:
-        server-addr: 172.23.104.184
+        server-addr: 100.81.212.120
       config:
-        server-addr: 172.23.104.184
+        server-addr: 100.81.212.120
         file-extension: yml
         username: nacos
         password: nacos
         namespace: 12705118-223c-456b-817f-3838f5735680
-  ai:
-    openai:
-      # ?????API?? https://ark.cn-beijing.volces.com/api/v3/chat/completions
-      base-url: https://ark.cn-beijing.volces.com/api/
-      chat:
-        options:
-          # ??ID,???????????ID
-          model: doubao-1-5-lite-32k-250115
-        # Chat????,?OpenAI??????
-        completions-path: /v3/chat/completions
   main:
     allow-circular-references: true
 logging:

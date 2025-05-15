@@ -122,23 +122,23 @@ public abstract class BaseAgent {
         String stepPrompt = """
                 - SYSTEM INFORMATION:
                 OS: %s %s (%s)
-                
+                                
                 - Current Date:
                 %s
                 - 全局计划信息:
                 {planStatus}
-                
+                                
                 - 当前要做的步骤要求 :
                 STEP {currentStepIndex} :{stepText}
-                
+                                
                 - 当前步骤的上下文信息:
                 {extraParams}
-                
+                                
                 重要说明：
                 1. 使用工具调用时，不需要额外的任何解释说明！
                 2. 不要在工具调用前提供推理或描述！
                 3. 专注于立即行动而非解释！
-                
+                                
                 """.formatted(osName, osVersion, osArch, currentDateTime);
 
         SystemPromptTemplate promptTemplate = new SystemPromptTemplate(stepPrompt);
@@ -167,7 +167,7 @@ public abstract class BaseAgent {
         this.planId = request.getPlanContext().getPlanId();
     }
 
-    public void run( Map<String, Object> stepData) {
+    public void run(Map<String, Object> stepData) {
         currentStep = 0;
         this.stepData = stepData;
         if (state != AgentState.IN_PROGRESS) {
@@ -176,9 +176,11 @@ public abstract class BaseAgent {
 
         try {
             while (currentStep < maxSteps && !state.equals(AgentState.COMPLETED)) {
+                log.info("正在运行计划 step {} of {}", currentStep + 1, maxSteps);
                 currentStep++;
-                step();
+                 step();
             }
+            log.info("计划执行完成，当前状态: {} ，总步长：{}", state, currentStep);
         } catch (Exception e) {
             log.error("Agent execution failed", e);
             throw e; // 重新抛出异常，让上层调用者知道发生了错误

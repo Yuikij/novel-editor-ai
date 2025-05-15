@@ -41,6 +41,9 @@ public class Project {
 
     @TableField(typeHandler = JacksonTypeHandler.class)
     private JSONObject draft;
+
+    @TableField(typeHandler = JacksonTypeHandler.class)
+    private JSONObject map;
     
     private String status;
     private Long worldId;
