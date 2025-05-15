@@ -63,7 +63,7 @@ public class WritingAgent extends ReActAgent {
     private final String reactSystemPrompt = """
             你是一个专业小说写作助手，使用ReAct（思考+行动）模式工作，严格遵循以下流程：
             
-            1. 思考：分析当前写作步骤，提出相关问题并给出简短回答
+            1. 思考：分析当前写作步骤，提出相关问题并给出简短回答，避免思考内容和之前的思考或者正文相似
             2. 行动：基于思考结果，创作对应的小说内容
             3. 评估：判断是否达到终止条件，决定继续或结束
             
@@ -120,6 +120,9 @@ public class WritingAgent extends ReActAgent {
             你上次完成的内容是:
             {previousContent}
             
+            你上次思考的结果是:
+            {currentThink}
+            
             在继续写作前，结合上文（如果有），并进行结构化思考：
             1. 自动生成3个与此步骤相关的问题，考虑以下方面：
                - 场景的氛围、感官细节或设定。
@@ -139,14 +142,16 @@ public class WritingAgent extends ReActAgent {
             
             请结合你之前的思考，不要出现重复冗余的问题，避免出现重复性的思考！
             
-            注意：如果你认为该步骤已经完成，则不需要输出问题，并且将isCompleted设为false。
+            注意：如果你认为该步骤已经完成，则不需要输出问题，并且将isCompleted设为false并且返回空的思考列表。
             
             输出的格式为：{format}
             """;
 
     private final String actionPromptTemplate = """
             
-            根据你的思考结果:{currentThink}，执行写作计划中的第{stepNumber}步：{stepContent}。
+            根据你的思考结果:{currentThink}，
+            
+            执行写作计划中的第{stepNumber}步：{stepContent}。
             
             你上次完成的内容是:
             {previousContent}
@@ -155,7 +160,8 @@ public class WritingAgent extends ReActAgent {
             - 使用生动、具体的语言，营造(根据上下文推断的语气，例如"悬疑、紧张"或"温馨、感人")的氛围。
             - 保持与上下文的连贯性，特别是上一段内容。
             - 融入符合角色性格和情节发展的细节，必要时添加创意元素以增强叙事。
-            - 专注具体的剧情和细节，不能有过多的总结和重复陈述。
+            - 专注具体的剧情和细节以及人物心理描写，不能有过多的总结和重复陈述。
+            - 你负责的只是文章的某个片段，不需要每次在最后做总结式结尾。
             
             现在撰写文本。请直接输出文本内容，而不是结构化内容
             """;
@@ -319,6 +325,7 @@ public class WritingAgent extends ReActAgent {
             this.chapterContentRequest.getPlanContext().setPlanState(PlanState.IN_PROGRESS);
             this.stepData.put("format", converter.getFormat());
             this.stepData.put("previousContent", previousContent);
+            this.stepData.put("currentThink", currentThink);
             Message thinkMessage = promptTemplate.createMessage(this.stepData);
             List<Message> messageList = new ArrayList<>();
             addThinkPrompt(messageList);
