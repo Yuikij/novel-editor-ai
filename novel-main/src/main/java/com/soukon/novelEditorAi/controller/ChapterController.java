@@ -259,5 +259,23 @@ public class ChapterController {
         return planContext.getPlanStream();
     }
 
+    /**
+     * 通知后端前端已完成消费
+     */
+    @PostMapping("/generate/content/completed")
+    public ResponseEntity<String> notifyContentConsumed(@RequestParam("planId") String planId) {
+        log.info("前端通知内容已消费完毕，计划ID: {}", planId);
+
+        // 从章节内容服务中获取计划上下文
+        PlanContext planContext = chapterContentService.getPlanContextMap().get(planId);
+        if (planContext == null) {
+            return ResponseEntity.badRequest().body("计划不存在，请检查计划ID是否正确");
+        }
+
+        // 通知完成消费
+        planContext.notifyConsumptionCompleted();
+
+        return ResponseEntity.ok("通知成功");
+    }
 
 } 

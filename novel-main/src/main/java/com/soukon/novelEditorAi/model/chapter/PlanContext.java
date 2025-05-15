@@ -17,7 +17,14 @@ public class PlanContext {
     public PlanContext(String planId) {
         this.planId = planId;
     }
-    
 
+    /**
+     * 通知服务器前端已完成流的消费
+     */
+    public void notifyConsumptionCompleted() {
+        if (this.completionLatch != null) {
+            this.completionLatch.countDown();
+        }
+    }
 
 }

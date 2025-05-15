@@ -25,52 +25,55 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class ReActAgent extends BaseAgent {
 
-	private static final Logger logger = LoggerFactory.getLogger(ReActAgent.class);
+    private static final Logger logger = LoggerFactory.getLogger(ReActAgent.class);
 
-	/**
-	 * 构造函数
-	 * @param llmService LLM服务实例，用于处理自然语言交互
+    /**
+     * 构造函数
+     *
+     * @param llmService LLM服务实例，用于处理自然语言交互
+     */
+    public ReActAgent(LlmService llmService, ChapterContentRequest request) {
+        super(llmService, request);
+    }
 
-	 */
-	public ReActAgent(LlmService llmService, ChapterContentRequest request) {
-		super(llmService,request);
-	}
+    /**
+     * 执行思考过程，判断是否需要采取行动
+     * <p>
+     * 子类实现要求： 1. 分析当前状态和上下文 2. 进行逻辑推理，得出下一步行动的决策 3. 返回是否需要执行行动
+     * <p>
+     * 示例实现： - 如果需要调用工具，返回true - 如果当前步骤已完成，返回false
+     *
+     * @return true表示需要执行行动，false表示当前不需要行动
+     */
+    protected abstract boolean think();
 
-	/**
-	 * 执行思考过程，判断是否需要采取行动
-	 *
-	 * 子类实现要求： 1. 分析当前状态和上下文 2. 进行逻辑推理，得出下一步行动的决策 3. 返回是否需要执行行动
-	 *
-	 * 示例实现： - 如果需要调用工具，返回true - 如果当前步骤已完成，返回false
-	 * @return true表示需要执行行动，false表示当前不需要行动
-	 */
-	protected abstract boolean think();
+    /**
+     * 执行具体的行动
+     * <p>
+     * 子类实现要求： 1. 基于think()的决策执行具体操作 2. 可以是工具调用、状态更新等具体行为 3. 返回执行结果的描述信息
+     * <p>
+     * 示例实现： - ToolCallAgent：执行选定的工具调用 - BrowserAgent：执行浏览器操作
+     *
+     * @return 行动执行的结果描述
+     */
+    protected abstract AgentExecResult act();
 
-	/**
-	 * 执行具体的行动
-	 *
-	 * 子类实现要求： 1. 基于think()的决策执行具体操作 2. 可以是工具调用、状态更新等具体行为 3. 返回执行结果的描述信息
-	 *
-	 * 示例实现： - ToolCallAgent：执行选定的工具调用 - BrowserAgent：执行浏览器操作
-	 * @return 行动执行的结果描述
-	 */
-	protected abstract AgentExecResult act();
+    /**
+     * 执行一个完整的思考-行动步骤
+     *
+     * @return 如果不需要行动则返回思考完成的消息，否则返回行动的执行结果
+     */
+    @Override
+    public AgentExecResult step() {
 
-	/**
-	 * 执行一个完整的思考-行动步骤
-	 * @return 如果不需要行动则返回思考完成的消息，否则返回行动的执行结果
-	 */
-	@Override
-	public AgentExecResult step() {
-
-		boolean shouldAct = think();
-		if (!shouldAct) {
-			AgentExecResult result = new AgentExecResult("Thinking complete - no action needed",
-					AgentState.IN_PROGRESS);
-
-			return result;
-		}
-		return act();
-	}
+        boolean shouldAct = think();
+        if (!shouldAct) {
+            AgentExecResult result = new AgentExecResult("Thinking complete - no action needed",
+                    AgentState.IN_PROGRESS);
+            this.setState(AgentState.COMPLETED);
+            return result;
+        }
+        return act();
+    }
 
 }
