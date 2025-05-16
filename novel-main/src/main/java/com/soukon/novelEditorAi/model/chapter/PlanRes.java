@@ -12,7 +12,7 @@ public class PlanRes {
     @JsonPropertyDescription("完成计划之后的情节完成百分比")
     Integer completePercent;
     @JsonPropertyDescription("写作计划")
-    List<String> planList;
+    List<PlanDetailRes> planList;
 
 
 }

@@ -328,10 +328,7 @@ public class ChapterContentServiceImpl implements ChapterContentService {
 
     @Override
     public void generateChapterContentStreamFlux(ChapterContentRequest request) {
-
-        String planId = UuidUtils.generateUuid();
-        planContextMap.put(planId, new PlanContext(planId));
-
+        
         // 第一阶段：Reasoning - 理解和分析需求
         log.info("[Reasoning] 开始分析章节内容生成需求");
 
@@ -381,7 +378,7 @@ public class ChapterContentServiceImpl implements ChapterContentService {
         // 将reasoningRes保存到数据库
         // 第二阶段：Acting - 根据分析结果执行写作
         log.info("[Planing] 开始根据分析结果生成章节内容");
-        List<String> planList = planRes.getPlanList();
+        List<PlanDetailRes> planList = planRes.getPlanList();
         if (planList == null || planList.isEmpty()) {
             log.error("[Planing] 章节计划列表为空");
             throw new RuntimeException("生成章节内容失败：计划列表为空");
@@ -390,19 +387,21 @@ public class ChapterContentServiceImpl implements ChapterContentService {
         // 使用WritingAgent执行写作计划
         log.info("[Planing] 使用ReAct方式生成章节内容，计划步骤数: {}", planList.size());
         WritingAgent writingAgent = new WritingAgent(this.llmService, request);
-        writingAgent.setPlanId(planId);
+        writingAgent.setPlanId(request.getPlanContext().getPlanId());
         request.getPlanContext().setPlanState(PlanState.IN_PROGRESS);
         request.setPlan(planRes.toString());
         // 使用Flux合并所有步骤的内容
         int index = 1;
-        for (String planStep : planList) {
+        for (PlanDetailRes planStep : planList) {
             log.info("[Planing] 执行写作计划步骤: {}", planStep);
             writingAgent.setState(AgentState.IN_PROGRESS);
             Map<String, Object> executorParams = new HashMap<>();
-            executorParams.put("stepContent", planStep);
+            executorParams.put("stepContent", planStep.getPlanContent());
+            executorParams.put("goalWordCount", planStep.getGoalWordCount());
             executorParams.put("stepNumber", index++);
+            executorParams.put("goal", planRes.getGoal());
             writingAgent.run(executorParams);
         }
-        llmService.removeAgentChatClient(planId);
+        llmService.removeAgentChatClient(request.getPlanContext().getPlanId());
     }
 } 

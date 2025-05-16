@@ -115,7 +115,9 @@ public class WritingAgent extends ReActAgent {
     private final String thinkPromptTemplate = """
             
             思考：
-            你正在执行写作计划中的第{stepNumber}步：{stepContent}。
+            你正在执行写作计划中的第{stepNumber}步：{stepContent}，目标字数为：{goalWordCount}。
+            
+            你的总目标为：{goal}
             
             你上次完成的内容是:
             {previousContent}
@@ -142,7 +144,7 @@ public class WritingAgent extends ReActAgent {
             
             请结合你之前的思考，不要出现重复冗余的问题，避免出现重复性的思考！
             
-            注意：如果你认为该步骤已经完成，则不需要输出问题，并且将isCompleted设为false并且返回空的思考列表。
+            注意：如果你认为该步骤已经完成（即上下文表明章节或场景已自然结束或达到目标字数），则不需要输出问题，并且将isCompleted设为false并且返回空的思考列表。
             
             输出的格式为：{format}
             """;
@@ -151,7 +153,9 @@ public class WritingAgent extends ReActAgent {
             
             根据你的思考结果:{currentThink}，
             
-            执行写作计划中的第{stepNumber}步：{stepContent}。
+            执行写作计划中的第{stepNumber}步：{stepContent}，目标字数为：{goalWordCount}。
+            
+            你的总目标为：{goal}
             
             你上次完成的内容是:
             {previousContent}
@@ -320,7 +324,6 @@ public class WritingAgent extends ReActAgent {
     @Override
     protected boolean think() {
         try {
-            log.info("[Thinking] 正在思考");
             PromptTemplate promptTemplate = new PromptTemplate(thinkPromptTemplate);
             this.chapterContentRequest.getPlanContext().setPlanState(PlanState.IN_PROGRESS);
             this.stepData.put("format", converter.getFormat());
@@ -330,6 +333,7 @@ public class WritingAgent extends ReActAgent {
             List<Message> messageList = new ArrayList<>();
             addThinkPrompt(messageList);
             messageList.add(thinkMessage);
+            log.info("[Thinking] 正在思考：{}", messageList);
             String content = llmService.getAgentChatClient(planId)
                     .getChatClient()
                     .prompt(new Prompt(messageList)).call().content();
@@ -356,6 +360,7 @@ public class WritingAgent extends ReActAgent {
         // 调用LLM生成行动结果
         Prompt prompt = new Prompt(List.of(actionMessage));
         // 这个方法由父类ReActAgent调用，但我们使用自己的执行流程
+        log.info("[Thinking] 正在行动：{}", prompt);
         Flux<String> content = llmService.getAgentChatClient(planId)
                 .getChatClient()
                 .prompt(prompt).stream().content();
@@ -380,7 +385,7 @@ public class WritingAgent extends ReActAgent {
                     }
                 })
                 .doOnComplete(() -> {
-                    log.info("[Acting] Content stream completed, total length: {} characters", fullContent.length());
+                    log.info("[Acting] 行动结束：{}", fullContent);
                 })
                 .doOnError(error -> {
                     log.error("[Acting] Error in content stream: {}", error.getMessage(), error);

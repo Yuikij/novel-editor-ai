@@ -162,7 +162,7 @@ public abstract class BaseAgent {
 
     public BaseAgent(LlmService llmService, ChapterContentRequest request) {
         this.llmService = llmService;
-        this.maxSteps = 3;
+        this.maxSteps = 5;
         this.chapterContentRequest = request;
         this.planId = request.getPlanContext().getPlanId();
     }
