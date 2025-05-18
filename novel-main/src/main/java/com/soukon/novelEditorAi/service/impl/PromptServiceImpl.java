@@ -81,7 +81,7 @@ public class PromptServiceImpl implements PromptService {
                 - 明确一个具体的写作任务（如“描写主角进入新场景”或“编写角色间的冲突对话”）。
                 - 与上下文保持一致，推动故事发展。
                 - 具有逻辑性和连贯性。
-                - 在步骤描述之后明确该步骤的计划字数
+                - 在步骤描述之后明确该步骤的计划字数。**所有步骤的计划字数总和应与当前情节的目标字数大致相符。**
                 
                 然后给出完成计划之后的情节完成百分比
                 
@@ -175,7 +175,9 @@ public class PromptServiceImpl implements PromptService {
         Chapter currentChapter = context.getCurrentChapter();
         if (currentChapter != null) {
             userPromptBuilder.append("### 写作要求\n");
-            userPromptBuilder.append("- 目标字数：").append(request.getWordCountSuggestion()).append("字（必须严格遵守，优先级高于章节目标字数或其他字数要求）\n");
+            if (currentChapter.getWordCountGoal() != null){
+                userPromptBuilder.append("- 目标字数：").append(request.getWordCountSuggestion()).append("字（必须严格遵守，优先级高于章节目标字数或其他字数要求）\n");
+            }
             if (currentChapter.getContent() != null && !currentChapter.getContent().isEmpty()) {
                 userPromptBuilder.append("- 类型：续写\n");
             } else {

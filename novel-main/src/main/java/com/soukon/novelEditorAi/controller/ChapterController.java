@@ -192,7 +192,7 @@ public class ChapterController {
         ChapterContentRequest request = new ChapterContentRequest();
         request.setChapterId(chapterId);
         request.setPromptSuggestion(promptSuggestion == null ? "无" : promptSuggestion);
-        request.setWordCountSuggestion(wordCountSuggestion == null ? defaultWordsCount : wordCountSuggestion);
+//        request.setWordCountSuggestion(wordCountSuggestion == null ? defaultWordsCount : wordCountSuggestion);
         return chapterContentService.generateChapterContentExecute(request);
     }
 
@@ -274,7 +274,7 @@ public class ChapterController {
 
         // 通知完成消费
         planContext.notifyConsumptionCompleted();
-
+        planContext.setPlanStream(null);
         return ResponseEntity.ok("通知成功");
     }
 
