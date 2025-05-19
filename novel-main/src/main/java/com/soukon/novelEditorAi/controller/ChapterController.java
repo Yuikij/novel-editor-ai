@@ -6,7 +6,6 @@ import com.soukon.novelEditorAi.common.Result;
 import com.soukon.novelEditorAi.entities.Chapter;
 import com.soukon.novelEditorAi.service.ChapterService;
 import com.soukon.novelEditorAi.model.chapter.ChapterContentRequest;
-import com.soukon.novelEditorAi.model.chapter.ChapterContentResponse;
 import com.soukon.novelEditorAi.model.chapter.PlanContext;
 import com.soukon.novelEditorAi.model.chapter.PlanState;
 import com.soukon.novelEditorAi.service.ChapterContentService;
@@ -209,6 +208,8 @@ public class ChapterController {
 
         // 获取计划状态
         PlanState planState = planContext.getPlanState();
+        Integer progressRate = planContext.getProgress();
+        String message = planContext.getMessage();
         if (planState == null) {
             planState = PlanState.PLANNING; // 默认状态
         }
@@ -219,29 +220,8 @@ public class ChapterController {
         progressInfo.put("state", planState.getCode());
         progressInfo.put("stateMessage", planState.getMessage());
         progressInfo.put("hasContent", planContext.getPlanStream() != null);
-
-        // 根据不同状态提供不同信息
-        switch (planState) {
-            case PLANNING:
-                progressInfo.put("progress", 0);
-                progressInfo.put("message", "正在规划章节内容");
-                break;
-            case IN_PROGRESS:
-                progressInfo.put("progress", 50);
-                progressInfo.put("message", "正在生成章节内容");
-                break;
-            case GENERATING:
-                progressInfo.put("progress", 75);
-                progressInfo.put("message", "内容生成中");
-                break;
-            case COMPLETED:
-                progressInfo.put("progress", 100);
-                progressInfo.put("message", "内容已生成完成");
-                break;
-            default:
-                progressInfo.put("progress", 0);
-                progressInfo.put("message", "未知状态");
-        }
+        progressInfo.put("progress", progressRate);
+        progressInfo.put("message", message);
 
         return Result.success(planState.getMessage(), progressInfo);
     }

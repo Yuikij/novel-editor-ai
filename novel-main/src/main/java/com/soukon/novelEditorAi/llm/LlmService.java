@@ -348,7 +348,7 @@ public class LlmService {
             ChatMemory agentMemory = new InMemoryChatMemory();
             ChatClient agentChatClient = ChatClient.builder(chatModel)
                     .defaultSystem(PLANNING_SYSTEM_PROMPT)
-                    .defaultAdvisors(new MessageChatMemoryAdvisor(agentMemory))
+//                    .defaultAdvisors(new MessageChatMemoryAdvisor(agentMemory))
                     .defaultAdvisors(new SimpleLoggerAdvisor())
                     .defaultOptions(
                             OpenAiChatOptions.builder().temperature(0.8).build())

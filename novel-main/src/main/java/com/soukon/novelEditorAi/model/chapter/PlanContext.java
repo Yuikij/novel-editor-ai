@@ -3,10 +3,7 @@ package com.soukon.novelEditorAi.model.chapter;
 import lombok.Data;
 import reactor.core.publisher.Flux;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicInteger;
 
 @Data
 public class PlanContext {
@@ -14,6 +11,10 @@ public class PlanContext {
     private String planId;
     private Flux<String> planStream;
     private CountDownLatch completionLatch;
+    private String message;
+    //进度
+    private Integer progress;
+
     public PlanContext(String planId) {
         this.planId = planId;
     }

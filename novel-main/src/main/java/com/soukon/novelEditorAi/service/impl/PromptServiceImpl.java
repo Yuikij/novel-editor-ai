@@ -117,9 +117,12 @@ public class PromptServiceImpl implements PromptService {
             request.setGlobalContext(globalContext);
             userPromptBuilder.append(globalContext);
             userPromptBuilder.append("\n");
+            request.setCurrentPlot(firstIncompletePlot);
         } else {
-            userPromptBuilder.append("没有需要创作的情节\n");
+            userPromptBuilder.append("没有需要创作的情节，根据上文和目标字数创作\n");
         }
+
+
 
         // 提示
 

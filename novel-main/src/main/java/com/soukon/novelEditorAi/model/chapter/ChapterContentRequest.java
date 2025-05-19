@@ -1,5 +1,6 @@
 package com.soukon.novelEditorAi.model.chapter;
 
+import com.soukon.novelEditorAi.entities.Plot;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -17,6 +18,8 @@ import java.util.List;
 public class ChapterContentRequest {
 
     private PlanContext planContext;
+
+    private Plot currentPlot;
 
     /**
      * 章节ID

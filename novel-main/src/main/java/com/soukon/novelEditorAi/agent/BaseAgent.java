@@ -178,9 +178,9 @@ public abstract class BaseAgent {
             while (currentStep < maxSteps && !state.equals(AgentState.COMPLETED)) {
                 log.info("正在运行计划 step {} of {}", currentStep + 1, maxSteps);
                 currentStep++;
-                 step();
+                step();
             }
-            log.info("计划执行完成，当前状态: {} ，总步长：{}", state, currentStep);
+            log.info("计划执行完成，当前状态: {} ，总步长：{}", state, currentStep - 1);
         } catch (Exception e) {
             log.error("Agent execution failed", e);
             throw e; // 重新抛出异常，让上层调用者知道发生了错误
