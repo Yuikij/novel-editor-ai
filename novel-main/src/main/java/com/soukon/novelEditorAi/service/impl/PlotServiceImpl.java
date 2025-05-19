@@ -106,6 +106,36 @@ public class PlotServiceImpl extends ServiceImpl<PlotMapper, Plot> implements Pl
         return sb.toString();
     }
 
+
+    /**
+     * 生成用于构建生成请求 Prompt 的单个情节信息。
+     *
+     * @param plot 情节实体
+     * @return 包含情节描述的字符串，以列表项格式输出。
+     */
+    @Override
+    public String toCharacter(Plot plot) {
+        if (plot == null) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        if (plot.getCharacterIds() != null && !plot.getCharacterIds().isEmpty()) {
+            sb.append("涉及角色: ");
+            for (Long cid : plot.getCharacterIds()) {
+                if (cid != null) {
+                    com.soukon.novelEditorAi.entities.Character character = characterService.getById(cid);
+                    sb.append(characterService.toPrompt(character)).append(", ");
+                }
+            }
+            // 去掉最后一个逗号和空格
+            if (!sb.isEmpty() && sb.charAt(sb.length() - 2) == ',') {
+                sb.delete(sb.length() - 2, sb.length());
+            }
+            sb.append("\n");
+        }
+        return sb.toString();
+    }
+
     @Override
     public String toPrompt(Long chapterId) {
         List<Plot> plots = list(lambdaQuery().eq(Plot::getChapterId, chapterId));

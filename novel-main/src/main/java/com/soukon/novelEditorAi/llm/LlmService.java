@@ -351,7 +351,7 @@ public class LlmService {
 //                    .defaultAdvisors(new MessageChatMemoryAdvisor(agentMemory))
                     .defaultAdvisors(new SimpleLoggerAdvisor())
                     .defaultOptions(
-                            OpenAiChatOptions.builder().temperature(0.8).build())
+                            OpenAiChatOptions.builder().temperature(0.6).build())
                     .build();
             return new AgentChatClientWrapper(agentChatClient, agentMemory);
         });

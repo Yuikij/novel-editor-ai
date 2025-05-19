@@ -17,7 +17,7 @@ public interface PlotService extends IService<Plot> {
      */
     String toPrompt(Plot plot);
 
-
+    String toCharacter(Plot plot);
 
     /**
      * 生成用于构建生成请求 Prompt 的情节信息部分。

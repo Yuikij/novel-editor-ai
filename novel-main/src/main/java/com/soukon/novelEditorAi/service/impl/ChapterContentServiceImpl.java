@@ -382,11 +382,11 @@ public class ChapterContentServiceImpl implements ChapterContentService {
         }
 
         // 将planRes的completePercent保存到数据库
-        if (planRes.getCompletePercent() != null) {
-            Plot plot = request.getCurrentPlot();
-            plot.setCompletionPercentage(100);
-            plotService.updateById(plot);
-        }
+
+        Plot plot = request.getCurrentPlot();
+        plot.setCompletionPercentage(100);
+        plotService.updateById(plot);
+
 
         // 第二阶段：Acting - 根据分析结果执行写作
         log.info("[Planing] 开始根据分析结果生成章节内容");
@@ -409,13 +409,15 @@ public class ChapterContentServiceImpl implements ChapterContentService {
         for (PlanDetailRes planStep : planList) {
             log.info("[Planing] 执行写作计划步骤: {}", planStep);
             planContext.setMessage("正在执行写作计划步骤：" + planStep.getPlanContent());
-            planContext.setProgress(10 + index * 90 / planList.size());
+            planContext.setProgress(10 + (index-1) * 90 / planList.size());
             writingAgent.setState(AgentState.IN_PROGRESS);
             Map<String, Object> executorParams = new HashMap<>();
             executorParams.put("stepContent", planStep.getPlanContent());
             executorParams.put("goalWordCount", planStep.getGoalWordCount());
             executorParams.put("stepNumber", index++);
             executorParams.put("goal", planRes.getGoal());
+            executorParams.put("character", plotService.toCharacter(plot));
+            executorParams.put("plot", plot.getDescription());
             writingAgent.run(executorParams);
         }
         llmService.removeAgentChatClient(planContext.getPlanId());

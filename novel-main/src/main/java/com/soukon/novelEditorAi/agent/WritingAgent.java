@@ -72,18 +72,18 @@ public class WritingAgent extends ReActAgent {
 
     private final String reactSystemPrompt = """
             你是一个专业小说写作助手，使用ReAct（思考+行动）模式工作，严格遵循以下流程：
-
+            
             1. 思考：分析当前写作步骤，聚焦于如何在前文基础上进行**深化描写、推进情节、展现角色性格或引入符合当前步骤目标的细节**。提出相关问题并给出简短回答，确保思考具有建设性，避免简单重复或与已有内容高度相似。
             2. 行动：基于思考结果，创作对应的小说内容
             3. 评估：判断是否达到终止条件，决定继续或结束
-
+            
             每个步骤要有明确的标记和格式。
-
+            
             全局计划完成情节：
             {global}
             全局步骤计划:
             {plan}
-
+            
             """;
 
     @Data
@@ -153,22 +153,24 @@ public class WritingAgent extends ReActAgent {
 //            """;
 
     private final String thinkPromptTemplate = """
-
+            
             思考：
             你正在执行写作计划中的第{stepNumber}步：{stepContent}
-                        
+            
             目标字数为：{goalWordCount}
-                        
+            
             当前字数为：{currentWordCount}
-
+            
             你的总目标为：{goal}
-                        
+            
+            情节的大纲为：{plot}
+            
             你上次完成的内容是:
             {previousContent}
-
+            
             你上次思考的结果是:
             {currentThink}
-
+            
             在继续写作前，结合上下文，执行以下步骤：
             1. **检查完成状态**：
                - 判断“场景是否自然结束”：检查上次完成的内容是否表明当前场景的主要事件已解决（如角色完成目标、场景切换、情节达到高潮或转折）。
@@ -187,9 +189,9 @@ public class WritingAgent extends ReActAgent {
                   - 回答：[简短回答]
                 - 问题3：[生成的问题]
                   - 回答：[简短回答]
-
+            
             确保问题和回答与上下文和步骤目标一致，为后续写作提供清晰、新颖且具体的指导。避免重复宽泛的思考。
-
+            
             输出的格式为：{format}
             """;
 
@@ -210,16 +212,20 @@ public class WritingAgent extends ReActAgent {
 //            """;
 
     private final String actionPromptTemplate = """
-
+            
             执行写作计划中的第{stepNumber}步：{stepContent}，目标字数为：{goalWordCount}。
             
             你的思考结果是:{currentThink}，
-
+            
             你的总目标为：{goal}
-
+            
+            情节的大纲为：{plot}
+            
+            需要涉及的角色为：{character}
+            
             你上次完成的内容是:
             {previousContent}
-
+            
             写作指南：
             - 严格遵守目标字数和思考的问答情况。
             - 使用生动、具体的语言，重点营造与思考结果和当前情节发展相适应的氛围。
@@ -227,19 +233,19 @@ public class WritingAgent extends ReActAgent {
             - 融入符合角色性格和情节发展的细节，必要时添加创意元素以增强叙事，人设尽量通过侧面和细节表现，而不是直白表现。
             - 专注具体的剧情和细节以及人物心理描写，不能有过多的总结和重复陈述。
             - 你负责的只是文章的某个片段，不需要每次在最后做总结式结尾。
-
+            
             现在撰写文本，按照要求的字数和上述思考的问答情况。请直接输出文本内容，而不是结构化内容，不需要下一步的思考计划
             """;
 
     private final String evaluatePromptTemplate = """
-                        
+            
             完成当前步骤后，返回写作计划并执行下一步。
-                        
+            
             终止条件：
             - 计划中的所有步骤均已完成，或
             - 总字数达到{targetWordCount}字，或
             - 上下文表明章节或场景已自然结束（例如，达到情节高潮或转折点）。
-                        
+            
             如果继续，简要说明下一步的重点；如果停止，说明原因并总结已完成的内容。
             """;
 
@@ -320,7 +326,7 @@ public class WritingAgent extends ReActAgent {
 
             // 判断是否需要终止
             boolean shouldTerminate = currentStepNumber >= planSteps.size() ||
-                                      currentWordCount >= targetWordCount;
+                    currentWordCount >= targetWordCount;
 
             if (shouldTerminate) {
                 return new AgentExecResult(actionResult, AgentState.COMPLETED);
@@ -397,7 +403,8 @@ public class WritingAgent extends ReActAgent {
                 return false;
             }
             PromptTemplate promptTemplate = new PromptTemplate(thinkPromptTemplate);
-            this.chapterContentRequest.getPlanContext().setPlanState(PlanState.IN_PROGRESS);
+            PlanContext planContext = this.chapterContentRequest.getPlanContext();
+            planContext.setPlanState(PlanState.IN_PROGRESS);
             this.stepData.put("format", converter.getFormat());
             this.stepData.put("previousContent", previousContent);
             this.stepData.put("currentThink", currentThink);
@@ -429,6 +436,7 @@ public class WritingAgent extends ReActAgent {
         PromptTemplate promptTemplate = new PromptTemplate(actionPromptTemplate);
         stepData.put("previousContent", previousContent);
         stepData.put("currentThink", currentThink);
+        this.chapterContentRequest.getPlanContext().setMessage("正在思考：" + currentThink);
         Message actionMessage = promptTemplate.createMessage(stepData);
         // 调用LLM生成行动结果
         Prompt prompt = new Prompt(List.of(actionMessage));
