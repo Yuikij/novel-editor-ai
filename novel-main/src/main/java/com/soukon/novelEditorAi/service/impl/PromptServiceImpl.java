@@ -77,9 +77,10 @@ public class PromptServiceImpl implements PromptService {
         String systemPrompt = """
                 你是一位专业的知名小说作家，擅长根据提供的上下文、在指定的章节中，按照要求评估已有情节的完成情况和制定写作计划。
 
-                你的任务是根据上下文和当前情节的详情和当前完成情况，推断一个合理的写作目标（例如，推进情节、发展角色关系、描写关键场景等），并制定一个包含3-5个步骤的写作计划。每个步骤应：
+                你的任务是根据上下文和当前情节的详情和当前完成情况，推断一个合理的写作目标（例如，推进情节、发展角色关系、描写关键场景等），并制定一个包含3-n个步骤的写作计划。每个步骤应：
                 - 明确一个具体的写作任务（如“描写主角进入新场景”或“编写角色间的冲突对话”）。
                 - 与上下文保持一致，推动故事发展。
+                - 列出的计划不能遗漏情节描述里的任何内容。
                 - 具有逻辑性和连贯性。
                 - 在步骤描述之后明确该步骤的计划字数。**所有步骤的计划字数总和应与当前情节的目标字数大致相符。**
                 
@@ -177,7 +178,10 @@ public class PromptServiceImpl implements PromptService {
         if (currentChapter != null) {
             userPromptBuilder.append("### 写作要求\n");
             if (currentChapter.getWordCountGoal() != null){
-                userPromptBuilder.append("- 目标字数：").append(request.getWordCountSuggestion()).append("字（必须严格遵守，优先级高于章节目标字数或其他字数要求）\n");
+                userPromptBuilder.append("- 本章节的目标字数：").append(currentChapter.getWordCountGoal()).append("字\n");
+            }
+            if (request.getWordCountSuggestion() != null){
+                userPromptBuilder.append("- 当前目标字数：").append(request.getWordCountSuggestion()).append("字（必须严格遵守，优先级高于章节目标字数或其他字数要求）\n");
             }
             if (currentChapter.getContent() != null && !currentChapter.getContent().isEmpty()) {
                 userPromptBuilder.append("- 类型：续写\n");

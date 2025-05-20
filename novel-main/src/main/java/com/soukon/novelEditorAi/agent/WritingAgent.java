@@ -161,6 +161,8 @@ public class WritingAgent extends ReActAgent {
             
             当前字数为：{currentWordCount}
             
+            写作建议：{promptSuggestion}
+            
             你的总目标为：{goal}
             
             情节的大纲为：{plot}
@@ -215,11 +217,11 @@ public class WritingAgent extends ReActAgent {
             
             执行写作计划中的第{stepNumber}步：{stepContent}，目标字数为：{goalWordCount}。
             
-            你的思考结果是:{currentThink}，
+            该步骤所属的情节大纲为：{plot}
             
-            你的总目标为：{goal}
+            参考你的思考结果:{currentThink}，
             
-            情节的大纲为：{plot}
+            写作建议：{promptSuggestion}
             
             需要涉及的角色为：{character}
             
@@ -227,14 +229,14 @@ public class WritingAgent extends ReActAgent {
             {previousContent}
             
             写作指南：
-            - 严格遵守目标字数和思考的问答情况。
+            - 与上文保持连贯性，防止突兀的剧情或发展。
+            - 遵守目标字数，思考的问答情况和情节大纲，必要时根据大纲添加内容补充创作，弥补计划步骤和思考中缺少的内容。
             - 使用生动、具体的语言，重点营造与思考结果和当前情节发展相适应的氛围。
-            - 保持与上下文的连贯性，特别是上一段内容。
-            - 融入符合角色性格和情节发展的细节，必要时添加创意元素以增强叙事，人设尽量通过侧面和细节表现，而不是直白表现。
+            - 尊重人物设定，融入符合角色性格和情节发展的细节，尽量通过侧面和细节表现，而不是直白表现。
             - 专注具体的剧情和细节以及人物心理描写，不能有过多的总结和重复陈述。
             - 你负责的只是文章的某个片段，不需要每次在最后做总结式结尾。
             
-            现在撰写文本，按照要求的字数和上述思考的问答情况。请直接输出文本内容，而不是结构化内容，不需要下一步的思考计划
+            现在撰写文本，按照情节的大纲和要求的字数和上述思考的问答情况。请直接输出文本内容，而不是结构化内容，不需要下一步的思考计划
             """;
 
     private final String evaluatePromptTemplate = """

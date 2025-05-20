@@ -418,6 +418,7 @@ public class ChapterContentServiceImpl implements ChapterContentService {
             executorParams.put("goal", planRes.getGoal());
             executorParams.put("character", plotService.toCharacter(plot));
             executorParams.put("plot", plot.getDescription());
+            executorParams.put("promptSuggestion", request.getPromptSuggestion());
             writingAgent.run(executorParams);
         }
         llmService.removeAgentChatClient(planContext.getPlanId());
