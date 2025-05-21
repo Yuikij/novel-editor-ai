@@ -1,6 +1,8 @@
 package com.soukon.novelEditorAi.entities;
 
+import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.annotation.*;
+import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
 import lombok.Data;
 import com.fasterxml.jackson.annotation.JsonFormat;
 
@@ -24,10 +26,23 @@ public class Chapter {
     private Long wordCountGoal; // 目标字数
     private Long wordCount; // 实际字数
     private String content; // 章节内容
+
+    @TableField(typeHandler = JacksonTypeHandler.class)
+    private JSONObject historyContent; // 章节历史内容
     //  类型结构
     private String type;
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdAt; // 创建时间
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updatedAt; // 更新时间
+    
+    // Default constructor to initialize historyContent
+    public Chapter() {
+        this.historyContent = new JSONObject();
+    }
+    
+    // Custom setter for historyContent to prevent null values
+    public void setHistoryContent(JSONObject historyContent) {
+        this.historyContent = historyContent == null ? new JSONObject() : historyContent;
+    }
 } 

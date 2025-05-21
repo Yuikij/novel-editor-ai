@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
+import com.alibaba.fastjson.JSONObject;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -122,6 +123,40 @@ public class ChapterController {
             return Result.error("Chapter not found with id: " + id);
         }
 
+        // Save chapter history before updating
+        if (existingChapter.getContent() != null && !existingChapter.getContent().isEmpty()) {
+            // Initialize historyContent if it's null
+            if (existingChapter.getHistoryContent() == null) {
+                existingChapter.setHistoryContent(new JSONObject());
+            }
+            
+            JSONObject historyContent = existingChapter.getHistoryContent();
+            
+            // Create a new history entry with timestamp as key
+            String timestamp = String.valueOf(System.currentTimeMillis());
+            historyContent.put(timestamp, existingChapter.getContent());
+            
+            // Keep only the most recent 10 entries
+            if (historyContent.size() > 10) {
+                // Find the oldest timestamp key
+                String oldestKey = historyContent.keySet().stream()
+                    .sorted()
+                    .findFirst()
+                    .orElse(null);
+                
+                // Remove the oldest entry
+                if (oldestKey != null) {
+                    historyContent.remove(oldestKey);
+                }
+            }
+            
+            // Set the updated history to the chapter
+            chapter.setHistoryContent(historyContent);
+        } else {
+            // Preserve existing history if available
+            chapter.setHistoryContent(existingChapter.getHistoryContent());
+        }
+
         chapter.setId(id);
         chapter.setCreatedAt(existingChapter.getCreatedAt());
         chapter.setUpdatedAt(LocalDateTime.now());
@@ -185,7 +220,7 @@ public class ChapterController {
 
     //    创建计划
     @GetMapping("/generate/execute")
-    public Result<String> generateChapterContentExecute(@RequestParam("chapterId") Long chapterId, @RequestParam("templateId") Long templateId,
+    public Result<String> generateChapterContentExecute(@RequestParam("chapterId") Long chapterId, @RequestParam(value = "templateId",required = false) Long templateId,
                                                         @RequestParam("projectId") Long projectId, HttpServletResponse response, @RequestParam(value = "promptSuggestion", required = false) String promptSuggestion,
                                                         @RequestParam(value = "wordCountSuggestion", required = false) Integer wordCountSuggestion) {
         response.setCharacterEncoding("UTF-8");
@@ -259,6 +294,127 @@ public class ChapterController {
         planContext.notifyConsumptionCompleted();
         planContext.setPlanStream(null);
         return ResponseEntity.ok("通知成功");
+    }
+
+    /**
+     * 获取章节历史内容
+     * 
+     * @param id 章节ID
+     * @return 历史内容列表
+     */
+    @GetMapping("/{id}/history")
+    public Result<JSONObject> getChapterHistory(@PathVariable("id") Long id) {
+        Chapter chapter = chapterService.getById(id);
+        if (chapter == null) {
+            return Result.error("Chapter not found with id: " + id);
+        }
+        
+        JSONObject historyContent = chapter.getHistoryContent();
+        if (historyContent == null) {
+            historyContent = new JSONObject();
+        }
+        
+        return Result.success("Chapter history retrieved successfully", historyContent);
+    }
+    
+    /**
+     * 根据时间戳获取特定版本的章节内容
+     * 
+     * @param id 章节ID
+     * @param timestamp 版本时间戳
+     * @return 指定版本的章节内容
+     */
+    @GetMapping("/{id}/history/{timestamp}")
+    public Result<String> getChapterHistoryVersion(@PathVariable("id") Long id, @PathVariable("timestamp") String timestamp) {
+        Chapter chapter = chapterService.getById(id);
+        if (chapter == null) {
+            return Result.error("Chapter not found with id: " + id);
+        }
+        
+        JSONObject historyContent = chapter.getHistoryContent();
+        if (historyContent == null || !historyContent.containsKey(timestamp)) {
+            return Result.error("History version not found for timestamp: " + timestamp);
+        }
+        
+        String content = historyContent.getString(timestamp);
+        return Result.success("History version retrieved successfully", content);
+    }
+    
+    /**
+     * 从历史版本恢复章节内容
+     * 
+     * @param id 章节ID
+     * @param timestamp 版本时间戳
+     * @return 恢复后的章节
+     */
+    @PostMapping("/{id}/history/{timestamp}/restore")
+    public Result<Chapter> restoreChapterFromHistory(@PathVariable("id") Long id, @PathVariable("timestamp") String timestamp) {
+        Chapter chapter = chapterService.getById(id);
+        if (chapter == null) {
+            return Result.error("Chapter not found with id: " + id);
+        }
+        
+        JSONObject historyContent = chapter.getHistoryContent();
+        if (historyContent == null || !historyContent.containsKey(timestamp)) {
+            return Result.error("History version not found for timestamp: " + timestamp);
+        }
+        
+        // Get content from history
+        String historicalContent = historyContent.getString(timestamp);
+        
+        // Save current content to history before restoring
+        String currentTimestamp = String.valueOf(System.currentTimeMillis());
+        historyContent.put(currentTimestamp, chapter.getContent());
+        
+        // Keep only the most recent 10 entries
+        if (historyContent.size() > 10) {
+            // Find the oldest timestamp key
+            String oldestKey = historyContent.keySet().stream()
+                .sorted()
+                .findFirst()
+                .orElse(null);
+            
+            // Remove the oldest entry
+            if (oldestKey != null) {
+                historyContent.remove(oldestKey);
+            }
+        }
+        
+        // Update chapter
+        chapter.setContent(historicalContent);
+        chapter.setUpdatedAt(LocalDateTime.now());
+        chapterService.updateById(chapter);
+        
+        return Result.success("Chapter restored from history successfully", chapter);
+    }
+
+    /**
+     * 删除特定版本的历史记录
+     * 
+     * @param id 章节ID
+     * @param timestamp 版本时间戳
+     * @return 操作结果
+     */
+    @DeleteMapping("/{id}/history/{timestamp}")
+    public Result<Void> deleteHistoryVersion(@PathVariable("id") Long id, @PathVariable("timestamp") String timestamp) {
+        Chapter chapter = chapterService.getById(id);
+        if (chapter == null) {
+            return Result.error("Chapter not found with id: " + id);
+        }
+        
+        JSONObject historyContent = chapter.getHistoryContent();
+        if (historyContent == null || !historyContent.containsKey(timestamp)) {
+            return Result.error("History version not found for timestamp: " + timestamp);
+        }
+        
+        // Remove the specific history entry
+        historyContent.remove(timestamp);
+        
+        // Update chapter
+        chapter.setUpdatedAt(LocalDateTime.now());
+        chapterService.updateById(chapter);
+        
+        return Result.success("History version deleted successfully", null);
     }
 
 } 
