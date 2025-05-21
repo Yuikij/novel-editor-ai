@@ -16,7 +16,7 @@ import java.util.List;
  * 条目管理控制器
  */
 @RestController
-@RequestMapping("/api/items")
+@RequestMapping("/items")
 @Slf4j
 public class ItemController {
 
@@ -62,7 +62,7 @@ public class ItemController {
      * @return 删除结果
      */
     @DeleteMapping("/{id}")
-    public Result<Boolean> deleteItem(@PathVariable Long id) {
+    public Result<Boolean> deleteItem(@PathVariable("id") Long id) {
         log.info("删除条目请求, ID: {}", id);
         return itemService.deleteItem(id);
     }
@@ -84,7 +84,7 @@ public class ItemController {
      * @return 条目信息
      */
     @GetMapping("/{id}")
-    public Result<Item> getItemById(@PathVariable Long id) {
+    public Result<Item> getItemById(@PathVariable("id") Long id) {
         log.info("查询条目请求, ID: {}", id);
         return itemService.getItemById(id);
     }
