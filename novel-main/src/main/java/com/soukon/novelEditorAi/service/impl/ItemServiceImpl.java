@@ -1,6 +1,7 @@
 package com.soukon.novelEditorAi.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.soukon.novelEditorAi.common.Result;
 import com.soukon.novelEditorAi.entities.Item;
@@ -198,5 +199,17 @@ public class ItemServiceImpl implements ItemService {
             log.error("根据标签查询条目失败: {}", e.getMessage(), e);
             return Result.error("查询失败: " + e.getMessage());
         }
+    }
+    @Override
+    public String getItemsPrompt(List<Long> ids) {
+        List<Item> items = itemMapper.selectList(Wrappers.lambdaQuery(Item.class).in(Item::getId, ids));
+        StringBuilder prompt = new StringBuilder();
+        for (Item item : items) {
+            prompt.append("条目名称: ").append(item.getName()).append("\n");
+            prompt.append("标签: ").append(item.getTags()).append("\n");
+            prompt.append("描述: ").append(item.getDescription()).append("\n");
+            prompt.append("------------------------\n");
+        }
+        return prompt.toString();
     }
 } 

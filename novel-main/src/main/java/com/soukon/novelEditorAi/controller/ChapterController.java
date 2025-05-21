@@ -185,10 +185,13 @@ public class ChapterController {
 
     //    创建计划
     @GetMapping("/generate/execute")
-    public Result<String> generateChapterContentExecute(@RequestParam("chapterId") Long chapterId, @RequestParam("projectId") Long projectId, HttpServletResponse response, @RequestParam(value = "promptSuggestion", required = false) String promptSuggestion, @RequestParam(value = "wordCountSuggestion", required = false) Integer wordCountSuggestion) {
+    public Result<String> generateChapterContentExecute(@RequestParam("chapterId") Long chapterId, @RequestParam("templateId") Long templateId,
+                                                        @RequestParam("projectId") Long projectId, HttpServletResponse response, @RequestParam(value = "promptSuggestion", required = false) String promptSuggestion,
+                                                        @RequestParam(value = "wordCountSuggestion", required = false) Integer wordCountSuggestion) {
         response.setCharacterEncoding("UTF-8");
         log.info("创建章节生成计划，章节ID: {}, 项目ID: {}", chapterId, projectId);
         ChapterContentRequest request = new ChapterContentRequest();
+        request.setTemplateId(templateId);
         request.setChapterId(chapterId);
         request.setPromptSuggestion(promptSuggestion == null ? "无" : promptSuggestion);
 //        request.setWordCountSuggestion(wordCountSuggestion == null ? defaultWordsCount : wordCountSuggestion);

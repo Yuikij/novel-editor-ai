@@ -1,8 +1,6 @@
 package com.soukon.novelEditorAi.entities;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 import com.fasterxml.jackson.annotation.JsonFormat;
 
@@ -16,6 +14,8 @@ public class Chapter {
     private Long id;
     
     private Long projectId; // 项目ID
+    @TableField(value = "template_id", updateStrategy = FieldStrategy.ALWAYS)
+    private Long templateId; // 模板ID
     private String title; // 章节标题
     private Integer sortOrder; // 排序顺序
     private String status; // 章节状态，枚举值：'draft'（草稿），'in-progress'（进行中），'completed'（已完成），'edited'（已编辑）

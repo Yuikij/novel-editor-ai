@@ -69,4 +69,6 @@ public interface ItemService {
      * @return 条目列表
      */
     Result<List<Item>> getItemsByTag(String tag);
-} 
+
+    String getItemsPrompt(List<Long> ids);
+}

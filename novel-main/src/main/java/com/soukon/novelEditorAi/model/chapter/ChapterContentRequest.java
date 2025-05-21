@@ -25,7 +25,9 @@ public class ChapterContentRequest {
      * 章节ID
      */
     private Long chapterId;
-    
+
+    private Long templateId;
+
     /**
      * 章节上下文
      */

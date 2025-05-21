@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.soukon.novelEditorAi.entities.Chapter;
 import com.soukon.novelEditorAi.entities.Plot;
 import com.soukon.novelEditorAi.mapper.PlotMapper;
+import com.soukon.novelEditorAi.service.ItemService;
 import com.soukon.novelEditorAi.service.PlotService;
 import com.soukon.novelEditorAi.service.CharacterService;
 import com.soukon.novelEditorAi.service.ChapterService;
@@ -37,7 +38,10 @@ public class PlotServiceImpl extends ServiceImpl<PlotMapper, Plot> implements Pl
     
     @Autowired
     private ChapterService chapterService;
-    
+
+    @Autowired
+    private ItemService itemService;
+
     private final PlotMapper plotMapper;
     private final ChatClient chatClient;
     
@@ -102,6 +106,11 @@ public class PlotServiceImpl extends ServiceImpl<PlotMapper, Plot> implements Pl
                 sb.delete(sb.length() - 2, sb.length());
             }
             sb.append("\n");
+        }
+        if (plot.getItemIds() != null && !plot.getItemIds().isEmpty()) {
+            sb.append("相关条目: ");
+            String itemsPrompt = itemService.getItemsPrompt(plot.getItemIds());
+            sb.append(itemsPrompt).append("\n");
         }
         return sb.toString();
     }

@@ -17,16 +17,7 @@ import com.soukon.novelEditorAi.mapper.PlotMapper;
 import com.soukon.novelEditorAi.mapper.ProjectMapper;
 import com.soukon.novelEditorAi.mapper.WorldMapper;
 import com.soukon.novelEditorAi.model.chapter.*;
-import com.soukon.novelEditorAi.service.ChapterContentService;
-import com.soukon.novelEditorAi.service.RagService;
-import com.soukon.novelEditorAi.service.ProjectService;
-import com.soukon.novelEditorAi.service.ChapterService;
-import com.soukon.novelEditorAi.service.WorldService;
-import com.soukon.novelEditorAi.service.CharacterService;
-import com.soukon.novelEditorAi.service.PlotService;
-import com.soukon.novelEditorAi.service.CharacterRelationshipService;
-import com.soukon.novelEditorAi.service.OutlinePlotPointService;
-import com.soukon.novelEditorAi.service.PromptService;
+import com.soukon.novelEditorAi.service.*;
 import lombok.Getter;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
@@ -80,6 +71,8 @@ public class ChapterContentServiceImpl implements ChapterContentService {
     private final PlotService plotService;
     private final CharacterRelationshipService characterRelationshipService;
     private final OutlinePlotPointService outlinePlotPointService;
+    @Autowired
+    private  ItemService itemService;
 
     @Getter
     private ConcurrentHashMap<String, PlanContext> planContextMap = new ConcurrentHashMap<>();
@@ -404,6 +397,13 @@ public class ChapterContentServiceImpl implements ChapterContentService {
         planContext.setMessage("已完成计划设计，总目标" + planRes.getGoal());
         planContext.setProgress(10);
         request.setPlan(planRes.toString());
+
+
+        List<Long> itemIds = plot.getItemIds();
+        String itemsPrompt = "无";
+        if (itemIds != null && !itemIds.isEmpty()) {
+            itemsPrompt = itemService.getItemsPrompt(itemIds);
+        }
         // 使用Flux合并所有步骤的内容
         int index = 1;
         for (PlanDetailRes planStep : planList) {
@@ -419,6 +419,9 @@ public class ChapterContentServiceImpl implements ChapterContentService {
             executorParams.put("character", plotService.toCharacter(plot));
             executorParams.put("plot", plot.getDescription());
             executorParams.put("promptSuggestion", request.getPromptSuggestion());
+            if (itemsPrompt != null) {
+                executorParams.put("itemsPrompt", itemsPrompt);
+            }
             writingAgent.run(executorParams);
         }
         llmService.removeAgentChatClient(planContext.getPlanId());

@@ -167,6 +167,8 @@ public class WritingAgent extends ReActAgent {
             
             情节的大纲为：{plot}
             
+            情节的相关条目：{itemsPrompt}
+            
             你上次完成的内容是:
             {previousContent}
             
@@ -222,6 +224,8 @@ public class WritingAgent extends ReActAgent {
             参考你的思考结果:{currentThink}，
             
             写作建议：{promptSuggestion}
+            
+            涉及的条目：{itemsPrompt}
             
             需要涉及的角色为：{character}
             

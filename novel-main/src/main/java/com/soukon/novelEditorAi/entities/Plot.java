@@ -1,9 +1,6 @@
 package com.soukon.novelEditorAi.entities;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.*;
 import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
 import lombok.Data;
 import com.fasterxml.jackson.annotation.JsonFormat;
@@ -14,12 +11,14 @@ import java.util.List;
 @Data
 @TableName(value = "plots", autoResultMap = true)
 public class Plot {
-    
+
     @TableId(value = "id", type = IdType.ASSIGN_ID)
     private Long id;
-    
+
     private Long projectId;
     private Long chapterId;
+    @TableField(value = "template_id", updateStrategy = FieldStrategy.ALWAYS)
+    private Long templateId; // 模板ID
     private String title;
     private String description;
     private Integer sortOrder;
@@ -27,11 +26,14 @@ public class Plot {
     private String type;
     private String status;
     private Integer completionPercentage;
-//    目标字数
+    //  目标字数
     private Integer wordCountGoal;
 
     @TableField(typeHandler = JacksonTypeHandler.class)
     private List<Long> characterIds;
+    //  相关条目id
+    @TableField(typeHandler = JacksonTypeHandler.class)
+    private List<Long> itemIds;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdAt;
