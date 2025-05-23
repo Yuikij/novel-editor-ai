@@ -16,7 +16,9 @@ public interface PromptService {
      * @return 推理阶段的提示词消息列表
      */
     List<Message> buildReasoningPrompt(ChapterContentRequest request);
-    
+
+
+    List<Message> buildTemplatesPrompt(Long templateId);
     /**
      * 构建执行阶段的提示词（用于实际创作）
      * @param request 章节内容请求

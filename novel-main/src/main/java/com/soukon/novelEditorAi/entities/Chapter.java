@@ -9,12 +9,12 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("chapters")
+@TableName(value = "chapters", autoResultMap = true)
 public class Chapter {
-    
+
     @TableId(value = "id", type = IdType.ASSIGN_ID)
     private Long id;
-    
+
     private Long projectId; // 项目ID
     @TableField(value = "template_id", updateStrategy = FieldStrategy.ALWAYS)
     private Long templateId; // 模板ID
@@ -35,12 +35,12 @@ public class Chapter {
     private LocalDateTime createdAt; // 创建时间
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updatedAt; // 更新时间
-    
+
     // Default constructor to initialize historyContent
     public Chapter() {
         this.historyContent = new JSONObject();
     }
-    
+
     // Custom setter for historyContent to prevent null values
     public void setHistoryContent(JSONObject historyContent) {
         this.historyContent = historyContent == null ? new JSONObject() : historyContent;

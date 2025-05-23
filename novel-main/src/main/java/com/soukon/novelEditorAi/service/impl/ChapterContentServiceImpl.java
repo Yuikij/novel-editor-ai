@@ -375,11 +375,11 @@ public class ChapterContentServiceImpl implements ChapterContentService {
         }
 
         // 将planRes的completePercent保存到数据库
-
         Plot plot = request.getCurrentPlot();
-        plot.setCompletionPercentage(100);
-        plotService.updateById(plot);
-
+        if (!request.isFreedom()){
+            plot.setCompletionPercentage(100);
+            plotService.updateById(plot);
+        }
 
         // 第二阶段：Acting - 根据分析结果执行写作
         log.info("[Planing] 开始根据分析结果生成章节内容");

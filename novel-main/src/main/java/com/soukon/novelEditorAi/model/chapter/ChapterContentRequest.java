@@ -27,6 +27,7 @@ public class ChapterContentRequest {
     private Long chapterId;
 
     private Long templateId;
+    private boolean freedom;
 
     /**
      * 章节上下文
@@ -54,18 +55,18 @@ public class ChapterContentRequest {
      * 最大生成Token数
      */
     private Integer maxTokens;
-    
+
     /**
      * 温度参数 (0.0-1.0)
      */
     private Float temperature;
 
-    
+
     /**
      * 提示建议（如：写作风格、情感基调等建议）
      */
     private String promptSuggestion;
-    
+
     /**
      * 字数建议（如：希望生成的章节字数）
      */

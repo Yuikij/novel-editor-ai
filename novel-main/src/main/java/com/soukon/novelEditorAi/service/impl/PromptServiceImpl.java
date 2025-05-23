@@ -3,6 +3,8 @@ package com.soukon.novelEditorAi.service.impl;
 import com.soukon.novelEditorAi.entities.Chapter;
 import com.soukon.novelEditorAi.entities.Plot;
 import com.soukon.novelEditorAi.entities.Project;
+import com.soukon.novelEditorAi.entities.Template;
+import com.soukon.novelEditorAi.mapper.TemplateMapper;
 import com.soukon.novelEditorAi.model.chapter.ChapterContentRequest;
 import com.soukon.novelEditorAi.model.chapter.ChapterContext;
 import com.soukon.novelEditorAi.model.chapter.PlanRes;
@@ -14,6 +16,7 @@ import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.ai.document.Document;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -30,7 +33,11 @@ import java.util.Map;
 @Slf4j
 public class PromptServiceImpl implements PromptService {
 
+    @Autowired
+    private TemplateMapper templateMapper;
+
     private final ProjectService projectService;
+
     private final ChapterService chapterService;
     private final WorldService worldService;
     private final CharacterService characterService;
@@ -43,13 +50,13 @@ public class PromptServiceImpl implements PromptService {
     private Integer ragMaxResults;
 
     public PromptServiceImpl(ProjectService projectService,
-                          @Lazy ChapterService chapterService,
-                          WorldService worldService,
-                          CharacterService characterService,
-                          PlotService plotService,
-                          CharacterRelationshipService characterRelationshipService,
-                          OutlinePlotPointService outlinePlotPointService,
-                          RagService ragService) {
+                             @Lazy ChapterService chapterService,
+                             WorldService worldService,
+                             CharacterService characterService,
+                             PlotService plotService,
+                             CharacterRelationshipService characterRelationshipService,
+                             OutlinePlotPointService outlinePlotPointService,
+                             RagService ragService) {
         this.projectService = projectService;
         this.chapterService = chapterService;
         this.worldService = worldService;
@@ -83,8 +90,8 @@ public class PromptServiceImpl implements PromptService {
                 - 列出的计划不能遗漏情节描述里的任何内容。
                 - 具有逻辑性和连贯性。
                 - 在步骤描述之后明确该步骤的计划字数。**所有步骤的计划字数总和应与当前情节的目标字数大致相符。**
-                
-                
+                                
+                                
                 输出格式：
                 1. 推断的写作目标：{简述目标}
                 2. 写作计划：
@@ -93,9 +100,9 @@ public class PromptServiceImpl implements PromptService {
                    - 步骤3：{描述}
                    - （根据需要添加更多步骤直到完成当前情节的内容）
                 在制定计划时，优先考虑叙事连贯性、角色发展和情节推进。允许添加符合上下文的创意细节。
-                
+                                
                 直接输出结构化json格式，不需要额外的任何解释说明！
-                
+                                
                 输出的json格式为：{%s}
                 """.formatted(converter.getFormat());
 
@@ -119,8 +126,10 @@ public class PromptServiceImpl implements PromptService {
             request.setCurrentPlot(firstIncompletePlot);
         } else {
             userPromptBuilder.append("没有需要创作的情节，根据上文和目标字数创作\n");
+            Plot plot = new Plot();
+            plot.setWordCountGoal(request.getWordCountSuggestion());
+            plot.setDescription("根据上文和目标字数创作,相关建议为" + request.getPromptSuggestion());
         }
-
 
 
         // 提示
@@ -136,6 +145,31 @@ public class PromptServiceImpl implements PromptService {
         log.info("[Reasoning] 最终推理提示词(System):\n{}", systemPrompt);
         log.info("[Reasoning] 最终推理提示词(User):\n{}", userPromptBuilder.toString());
         return messages;
+    }
+
+    @Override
+    public List<Message> buildTemplatesPrompt(Long templateId) {
+        Template template = templateMapper.selectById(templateId);
+        String templateString = template.toString();
+        String systemPrompt = """
+                你是一位精通文学分析和创作的AI助手。请执行以下步骤:
+
+                1. 分析提供的文本样本，识别以下特征:
+                   - 句子长度和复杂度模式
+                   - 段落结构和转换方式
+                   - 词汇选择和修辞特色
+                   - 叙事视角和语气
+                   - 标点和语法习惯
+                   - 独特的写作习惯或风格特征
+
+                2. 创作新内容，严格遵循以下要求:
+                   - 保持相同的句子节奏和长度分布
+                   - 使用相似的词汇层次和修辞手法
+                   - 复制相同的段落结构和转换方式
+                   - 维持一致的叙事视角和语气
+                   - 模仿原作者的独特习惯和风格特征""";
+
+        return List.of();
     }
 
     private String extracted(ChapterContentRequest request, ChapterContext context) {
@@ -177,10 +211,10 @@ public class PromptServiceImpl implements PromptService {
         Chapter currentChapter = context.getCurrentChapter();
         if (currentChapter != null) {
             userPromptBuilder.append("### 写作要求\n");
-            if (currentChapter.getWordCountGoal() != null){
+            if (currentChapter.getWordCountGoal() != null) {
                 userPromptBuilder.append("- 本章节的目标字数：").append(currentChapter.getWordCountGoal()).append("字\n");
             }
-            if (request.getWordCountSuggestion() != null){
+            if (request.getWordCountSuggestion() != null) {
                 userPromptBuilder.append("- 当前目标字数：").append(request.getWordCountSuggestion()).append("字（必须严格遵守，优先级高于章节目标字数或其他字数要求）\n");
             }
             if (currentChapter.getContent() != null && !currentChapter.getContent().isEmpty()) {
@@ -223,7 +257,7 @@ public class PromptServiceImpl implements PromptService {
                 userPromptBuilder.append("(已截取最后部分内容)\n");
             }
             userPromptBuilder.append(content).append("\n\n");
-        }else{
+        } else {
             userPromptBuilder.append("已有内容为空\n");
         }
 
@@ -249,16 +283,16 @@ public class PromptServiceImpl implements PromptService {
         // 系统提示词 - 引导AI进行创作
         String systemPrompt = """
                 你是一位专业的小说写作专家，擅长根据提供的上下文、规划的情节列表编写小说章节内容。
-                
+                                
                 请根据提供的章节上下文信息和情节列表，创作符合要求的章节内容：
-                
+                                
                 1. 严格遵守情节列表的要求，按照顺序补全情节列表状态为未完成的章节，并且参考情节的字数要求
                 2. 严格遵守章节信息中规划的章节摘要，章节背景，符合章节位置
                 2. 内容必须符合小说风格、主题和设定，情节需要按照写作计划推动故事发展，有适当的起承转合
                 3. 角色性格和行为应保持连贯一致，包含适当的对话和内心活动
                 5. 文风要符合指定的写作偏好，有细节和环节描写
                 6. 确保内容衔接自然，与前面章节保持连贯
-                
+                                
                 请不要添加章节标题或数字编号，直接从正文内容开始编写。
                 按照写作计划中的结构，创作流畅、引人入胜的章节内容。
                 """;
@@ -293,7 +327,7 @@ public class PromptServiceImpl implements PromptService {
 
     /**
      * 构建小说上下文信息
-     * 
+     *
      * @param projectId 项目ID
      * @return 包含小说相关信息的Map
      */

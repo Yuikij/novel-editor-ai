@@ -38,4 +38,14 @@ public class Template {
      * 内容
      */
     private String content;
-} 
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("模板信息").append("\n");
+        sb.append("模板名称: ").append(name).append("\n");
+        sb.append("模板标签: ").append(tags).append("\n");
+        sb.append("模板内容").append(content).append("\n");
+        return sb.toString();
+    }
+}
