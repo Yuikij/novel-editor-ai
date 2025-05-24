@@ -3,8 +3,6 @@ package com.soukon.novelEditorAi;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.ai.rag.Query;
-import org.springframework.ai.rag.preretrieval.query.expansion.MultiQueryExpander;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
@@ -28,20 +26,20 @@ class NovelEditorAiApplicationTests {
                         "5. 如有需要，可以提供替代方案")
                 .build();
 
-// 构建查询扩展器
-// 用于生成多个相关的查询变体，以获得更全面的搜索结果
-        MultiQueryExpander queryExpander = MultiQueryExpander.builder()
-                .chatClientBuilder(ChatClient.builder(openAiChatModel))
-                .includeOriginal(false) // 不包含原始查询
-                .numberOfQueries(3) // 生成3个查询变体
-                .build();
-
-// 执行查询扩展
-// 将原始问题"请提供几种推荐的装修风格?"扩展成多个相关查询
-        List<Query> queries = queryExpander.expand(
-                new Query("请提供几种推荐的装修风格?"));
-
-        System.out.println(queries);
+//// 构建查询扩展器
+//// 用于生成多个相关的查询变体，以获得更全面的搜索结果
+//        MultiQueryExpander queryExpander = MultiQueryExpander.builder()
+//                .chatClientBuilder(ChatClient.builder(openAiChatModel))
+//                .includeOriginal(false) // 不包含原始查询
+//                .numberOfQueries(3) // 生成3个查询变体
+//                .build();
+//
+//// 执行查询扩展
+//// 将原始问题"请提供几种推荐的装修风格?"扩展成多个相关查询
+//        List<Query> queries = queryExpander.expand(
+//                new Query("请提供几种推荐的装修风格?"));
+//
+//        System.out.println(queries);
     }
 
 }

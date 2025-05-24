@@ -10,11 +10,21 @@ import com.soukon.novelEditorAi.mapper.ProjectMapper;
 import com.soukon.novelEditorAi.mapper.WorldMapper;
 import com.soukon.novelEditorAi.service.RagService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.document.Document;
+import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.reader.TextReader;
+import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -30,29 +40,111 @@ import java.util.Map;
 @Slf4j
 public class RagServiceImpl implements RagService {
 
-    private final VectorStore vectorStore;
+
     private final ProjectMapper projectMapper;
     private final ChapterMapper chapterMapper;
     private final CharacterMapper characterMapper;
     private final WorldMapper worldMapper;
 
+    private final ChatClient chatClient;
     @Value("${novel.rag.chunk-size:500}")
     private int chunkSize;
 
     @Value("${novel.rag.chunk-overlap:50}")
     private int chunkOverlap;
 
+
     @Autowired
-    public RagServiceImpl(VectorStore vectorStore,
-                          ProjectMapper projectMapper,
+    private ResourceLoader resourceLoader;
+
+    @Autowired
+    private EmbeddingModel embeddingModel;
+
+
+    @Autowired
+    private VectorStore vectorStore;
+
+    @Autowired
+    public RagServiceImpl(ProjectMapper projectMapper,
                           ChapterMapper chapterMapper,
                           CharacterMapper characterMapper,
-                          WorldMapper worldMapper) {
-        this.vectorStore = vectorStore;
+                          WorldMapper worldMapper,
+                          ChatModel openAiChatModel) {
+
         this.projectMapper = projectMapper;
         this.chapterMapper = chapterMapper;
         this.characterMapper = characterMapper;
         this.worldMapper = worldMapper;
+        this.chatClient = ChatClient.builder(openAiChatModel)
+                // 实现 Chat Memory 的 Advisor
+                // 在使用 Chat Memory 时，需要指定对话 ID，以便 Spring AI 处理上下文。
+                // 实现 Logger 的 Advisor
+                .defaultAdvisors(
+                        new SimpleLoggerAdvisor()
+                )
+                // 设置 ChatClient 中 ChatModel 的 Options 参数
+                .defaultOptions(
+                        OpenAiChatOptions.builder()
+                                .topP(0.7)
+                                .build()
+                )
+                .build();
+    }
+
+
+
+    @Override
+    public void test() {
+
+        // 加载示例文档
+        Resource resource = resourceLoader.getResource("classpath:sample.txt");
+
+        // 使用 TextReader 读取文档
+        TextReader textReader = new TextReader(resource);
+        // 设置元数据
+        textReader.getCustomMetadata().put("source", "法国");
+        // 分块文档
+        // 对于文风分析，建议使用更大的分块以保持文本连贯性
+        TokenTextSplitter splitter = new TokenTextSplitter(
+                500,   // 最大令牌数，减小到 50，确保低于 512
+                20,   // 最小令牌数
+                5,    // 块重叠令牌数
+                Integer.MAX_VALUE, // 移除 maxChunks 限制
+                true  // 保留分隔符
+        );
+        List<Document> documents = splitter.apply(textReader.get());
+
+        log.info("分块后的文档数量: {}", documents.size());
+
+        // 存储到向量存储
+        log.info("Adding documents to vector store...");
+        vectorStore.add(documents);
+        log.info("Documents added successfully.");
+
+//        // 示例查询
+//        String query = "孙悟空是谁？";
+//
+//        // 检索相关文档
+//        log.info("Performing similarity search for query: {}", query);
+//        List<Document> results = vectorStore.similaritySearch(query);
+//
+//        // 构建上下文
+//        StringBuilder context = new StringBuilder();
+//        for (Document doc : results) {
+//            context.append(doc.getText()).append("\n");
+//        }
+//
+//        // 使用 ChatClient 进行 RAG
+//        log.info("Calling ChatClient with context...");
+//        String response = chatClient.prompt()
+//                .system("你是一个有用的助手。根据以下上下文回答问题：\n" + context)
+//                .user(query)
+//                .call()
+//                .content();
+//
+//        System.out.println("查询: " + query);
+//        System.out.println("回答: " + response);
+
     }
 
     @Override
@@ -66,8 +158,8 @@ public class RagServiceImpl implements RagService {
 
             // 先尝试删除现有文档（及其分块）
             try {
-                String filterExpression = "id == \"" + documentId + "\"" + 
-                                        " || id like \"" + documentId + "-chunk-%\"";
+                String filterExpression = "id == \"" + documentId + "\"" +
+                                          " || id like \"" + documentId + "-chunk-%\"";
                 vectorStore.delete(filterExpression);
                 log.debug("已删除现有文档: {}", documentId);
             } catch (Exception e) {
@@ -82,10 +174,10 @@ public class RagServiceImpl implements RagService {
             metadata.put("timestamp", System.currentTimeMillis());
 
             Document document = new Document(documentId, content, metadata);
-            
+
             // 添加到向量存储
             vectorStore.add(Collections.singletonList(document));
-            
+
             log.info("成功创建/更新文档: {}", documentId);
         } catch (Exception e) {
             log.error("创建/更新文档时发生错误: {}", e.getMessage(), e);
@@ -105,13 +197,13 @@ public class RagServiceImpl implements RagService {
                     .query(query)
                     .topK(5)  // 返回最相关的5个结果
                     .similarityThreshold(0.7f)
-                    .filterExpression("id == \"" + documentId + "\"" + 
-                                     " || id like \"" + documentId + "-chunk-%\"")
+                    .filterExpression("id == \"" + documentId + "\"" +
+                                      " || id like \"" + documentId + "-chunk-%\"")
                     .build();
 
             // 执行搜索
             List<Document> results = vectorStore.similaritySearch(request);
-            
+
             log.info("从文档 {} 检索到 {} 个相关结果", documentId, results.size());
             return results;
         } catch (Exception e) {
@@ -162,11 +254,11 @@ public class RagServiceImpl implements RagService {
                 log.warn("章节 {} 没有内容，跳过索引", chapterId);
                 return true;
             }
-            
+
             // 限制处理的文本长度，避免内存溢出
             final int MAX_INDEXABLE_LENGTH = 50000; // 设置最大可索引长度
             if (content.length() > MAX_INDEXABLE_LENGTH) {
-                log.warn("章节 {} 内容过长 ({}字符)，将只索引前 {} 字符", 
+                log.warn("章节 {} 内容过长 ({}字符)，将只索引前 {} 字符",
                         chapterId, content.length(), MAX_INDEXABLE_LENGTH);
                 content = content.substring(0, MAX_INDEXABLE_LENGTH);
             }
@@ -297,7 +389,7 @@ public class RagServiceImpl implements RagService {
                     .topK(maxResults)
                     .similarityThreshold(0.7f)
                     .filterExpression("projectId == " + chapter.getProjectId() +
-                            " && id != " + "\"chapter-" + chapterId + "\"")
+                                      " && id != " + "\"chapter-" + chapterId + "\"")
                     .build();
 
             // 执行相似度搜索
@@ -334,7 +426,7 @@ public class RagServiceImpl implements RagService {
         while (start < textLength) {
             // 计算结束位置，避免越界
             int end = Math.min(start + chunkSize, textLength);
-            
+
             // 优化边界查找逻辑
             if (end < textLength) {
                 // 限制搜索范围，避免过度搜索
@@ -344,7 +436,7 @@ public class RagServiceImpl implements RagService {
                     end = sentenceEnd;
                 }
             }
-            
+
             // 安全创建子字符串
             String chunk = null;
             try {
@@ -360,17 +452,17 @@ public class RagServiceImpl implements RagService {
                     break;
                 }
             }
-            
+
             if (chunk != null) {
                 chunks.add(chunk);
             }
-            
+
             // 下一个块的起始位置，考虑重叠
             start = end - overlap;
             if (start < 0 || start >= end) { // 确保进度是向前的
                 start = end;
             }
-            
+
             // 控制块数量，防止无限循环
             if (chunks.size() >= 2 * estimatedChunks) {
                 log.warn("块数量超过预期，可能有循环问题，强制结束: {}/{}", chunks.size(), estimatedChunks);
@@ -380,7 +472,7 @@ public class RagServiceImpl implements RagService {
 
         return chunks;
     }
-    
+
     /**
      * 优化的句子边界查找方法
      */
@@ -404,7 +496,7 @@ public class RagServiceImpl implements RagService {
         // 没找到句子边界，直接返回原位置
         return position;
     }
-    
+
     /**
      * 判断字符是否为句子结束符
      */

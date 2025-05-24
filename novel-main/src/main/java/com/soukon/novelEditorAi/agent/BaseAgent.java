@@ -193,23 +193,6 @@ public abstract class BaseAgent {
     protected abstract AgentExecResult step();
 
 
-    /**
-     * 检查是否处于卡住状态
-     */
-    protected boolean isStuck() {
-        // 目前判断是如果三次没有调用工具就认为是卡住了，就退出当前step。
-        List<Message> memoryEntries = llmService.getAgentChatClient(getPlanId()).getMemory().get(getPlanId(), 6);
-        int zeroToolCallCount = 0;
-        for (Message msg : memoryEntries) {
-            if (msg instanceof AssistantMessage) {
-                AssistantMessage assistantMsg = (AssistantMessage) msg;
-                if (assistantMsg.getToolCalls() == null || assistantMsg.getToolCalls().isEmpty()) {
-                    zeroToolCallCount++;
-                }
-            }
-        }
-        return zeroToolCallCount >= 3;
-    }
 
     public void setState(AgentState state) {
         this.state = state;

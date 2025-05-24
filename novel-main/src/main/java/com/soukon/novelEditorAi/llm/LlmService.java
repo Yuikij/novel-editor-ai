@@ -21,8 +21,9 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.chat.memory.InMemoryChatMemory;
+import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.MessageAggregator;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.stereotype.Service;
 
@@ -286,11 +287,11 @@ public class LlmService {
 
     // private final ChatClient chatClient;
 
-    private ChatMemory memory = new InMemoryChatMemory();
+
 
     private final ChatClient planningChatClient;
 
-    private ChatMemory planningMemory = new InMemoryChatMemory();
+
 
     private final ChatClient finalizeChatClient;
 
@@ -303,7 +304,6 @@ public class LlmService {
         // 执行和总结规划，用相同的memory
         this.planningChatClient = ChatClient.builder(chatModel)
                 .defaultSystem(PLANNING_SYSTEM_PROMPT)
-                .defaultAdvisors(new MessageChatMemoryAdvisor(planningMemory))
                 .defaultAdvisors(new SimpleLoggerAdvisor())
                 .defaultOptions(OpenAiChatOptions.builder().temperature(0.5).build())
                 .build();
@@ -316,7 +316,6 @@ public class LlmService {
         // .build();
 
         this.finalizeChatClient = ChatClient.builder(chatModel)
-                .defaultAdvisors(new MessageChatMemoryAdvisor(planningMemory))
                 .defaultAdvisors(new SimpleLoggerAdvisor())
                 .build();
 
@@ -345,15 +344,14 @@ public class LlmService {
 
     public AgentChatClientWrapper getAgentChatClient(String planId) {
         return agentClients.computeIfAbsent(planId, k -> {
-            ChatMemory agentMemory = new InMemoryChatMemory();
             ChatClient agentChatClient = ChatClient.builder(chatModel)
                     .defaultSystem(PLANNING_SYSTEM_PROMPT)
-//                    .defaultAdvisors(new MessageChatMemoryAdvisor(agentMemory))
+
                     .defaultAdvisors(new SimpleLoggerAdvisor())
                     .defaultOptions(
                             OpenAiChatOptions.builder().temperature(0.6).build())
                     .build();
-            return new AgentChatClientWrapper(agentChatClient, agentMemory);
+            return new AgentChatClientWrapper(agentChatClient, null);
         });
     }
 
@@ -372,9 +370,6 @@ public class LlmService {
         return finalizeChatClient;
     }
 
-    public ChatMemory getPlanningMemory() {
-        return planningMemory;
-    }
 
     public ChatModel getChatModel() {
         return chatModel;

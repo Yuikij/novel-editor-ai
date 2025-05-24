@@ -26,6 +26,24 @@ spring:
         namespace: 12705118-223c-456b-817f-3838f5735680
   main:
     allow-circular-references: true
+#  ai:
+#    vectorstore:
+#      chroma:
+#        initialize-schema: true
+#        collection-name:
+
+#        client:
+#          host:
+#          port:
+
+#  ai:
+#    openai:
+#      embedding:
+#        base-url: 1
+#        api-key: 1
+#        options:
+#          model: 111
+#        embeddings-path: 11
 logging:
   level:
     com.soukon.novelEditorAi.mapper: debug

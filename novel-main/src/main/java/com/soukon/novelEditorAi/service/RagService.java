@@ -10,7 +10,7 @@ import java.util.List;
  */
 public interface RagService {
 
-
+    void test();
     void createOrUpdateDocument(String content, String documentId);
 
 

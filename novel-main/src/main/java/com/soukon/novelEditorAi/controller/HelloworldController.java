@@ -21,7 +21,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
-import org.springframework.ai.chat.memory.InMemoryChatMemory;
+
+import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -29,8 +30,7 @@ import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 
-import static org.springframework.ai.chat.client.advisor.AbstractChatMemoryAdvisor.CHAT_MEMORY_CONVERSATION_ID_KEY;
-import static org.springframework.ai.chat.client.advisor.AbstractChatMemoryAdvisor.CHAT_MEMORY_RETRIEVE_SIZE_KEY;
+
 
 /**
  * @author yuluo
@@ -47,6 +47,9 @@ public class HelloworldController {
 
     // 也可以使用如下的方式注入 ChatClient
 	 public HelloworldController(ChatModel openAiChatModel) {
+		 MessageWindowChatMemory memory = MessageWindowChatMemory.builder()
+				 .maxMessages(10)
+				 .build();
 
          // 构造时，可以设置 ChatClient 的参数
 		 // {@link org.springframework.ai.chat.client.ChatClient};
@@ -54,7 +57,7 @@ public class HelloworldController {
 				 // 实现 Chat Memory 的 Advisor
 				 // 在使用 Chat Memory 时，需要指定对话 ID，以便 Spring AI 处理上下文。
 				 .defaultAdvisors(
-						 new MessageChatMemoryAdvisor(new InMemoryChatMemory())
+						 MessageChatMemoryAdvisor.builder(memory).build()
 				 )
 				 // 实现 Logger 的 Advisor
 				 .defaultAdvisors(
@@ -105,11 +108,7 @@ public class HelloworldController {
 		response.setCharacterEncoding("UTF-8");
 
 		return this.openAiChatClient.prompt(query)
-				.advisors(
-						a -> a
-								.param(CHAT_MEMORY_CONVERSATION_ID_KEY, id)
-								.param(CHAT_MEMORY_RETRIEVE_SIZE_KEY, 100)
-				).stream().content();
+				.stream().content();
 	}
 
 }
