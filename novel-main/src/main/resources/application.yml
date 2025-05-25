@@ -2,6 +2,11 @@ server:
   port: 18080
 
 spring:
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
+
   application:
     name: novel-editor-ai
   mvc:
