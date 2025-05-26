@@ -47,7 +47,7 @@ public class TemplateChatServiceImpl implements TemplateChatService {
     @Value("${novel.template.chat.max-results:5}")
     private int defaultMaxResults;
 
-    @Value("${novel.template.chat.similarity-threshold:0.7}")
+    @Value("${novel.template.chat.similarity-threshold:0.0}")
     private float defaultSimilarityThreshold;
 
     @Value("${novel.template.chat.max-tokens:2000}")
@@ -243,11 +243,7 @@ public class TemplateChatServiceImpl implements TemplateChatService {
 
             // 尝试多种过滤策略，按成功率排序
             String[] filterStrategies = {
-                "templateId == '" + request.getTemplateId() + "'",    // 单引号字符串 - 最有效
-                "templateId == \"" + request.getTemplateId() + "\"",  // 双引号字符串 - 最有效
                 "type == 'template' && templateId == '" + request.getTemplateId() + "'",
-                "type == \"template\" && templateId == \"" + request.getTemplateId() + "\"",
-                "templateId == " + request.getTemplateId()            // 数字类型 - 可能失败
             };
 
             List<Document> documents = null;
@@ -261,12 +257,12 @@ public class TemplateChatServiceImpl implements TemplateChatService {
                     SearchRequest searchRequest = SearchRequest.builder()
                             .query(request.getMessage())
                             .topK(maxResults)
-                            .similarityThreshold(similarityThreshold)
+//                            .similarityThreshold(similarityThreshold)
                             .filterExpression(filterExpression)
                             .build();
 
                     documents = vectorStore.similaritySearch(searchRequest);
-                    
+
                     if (!documents.isEmpty()) {
                         successfulFilter = filterExpression;
                         log.debug("过滤条件 '{}' 成功找到 {} 个文档", filterExpression, documents.size());
@@ -347,17 +343,13 @@ public class TemplateChatServiceImpl implements TemplateChatService {
             context.append("模板标签: ").append(template.getTags()).append("\n");
         }
         context.append("\n");
-
         // 添加相关文档内容
         if (!relevantDocs.isEmpty()) {
             context.append("=== 相关内容 ===\n");
-            for (int i = 0; i < relevantDocs.size(); i++) {
-                Document doc = relevantDocs.get(i);
-                context.append("片段 ").append(i + 1).append(":\n");
+            for (Document doc : relevantDocs) {
                 context.append(doc.getText()).append("\n\n");
             }
         }
-
         return context.toString();
     }
 

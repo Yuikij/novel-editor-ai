@@ -225,7 +225,7 @@ public class ChapterController {
         String timestamp = String.valueOf(System.currentTimeMillis());
         historyContent.put(timestamp, chapter.getContent());
         // Keep only the most recent 10 entries
-        if (historyContent.size() > 10) {
+        if (historyContent.size() > 6) {
             // Find the oldest timestamp key
             String oldestKey = historyContent.keySet().stream()
                     .sorted()
