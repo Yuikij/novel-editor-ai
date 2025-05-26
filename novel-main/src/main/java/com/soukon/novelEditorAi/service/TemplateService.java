@@ -107,4 +107,20 @@ public interface TemplateService {
      * @return 模板列表
      */
     Result<List<TemplateListDTO>> getTemplateListByTag(String tag);
+
+    /**
+     * 创建模板并自动触发向量化
+     * @param template 模板信息
+     * @param autoIndex 是否自动进行向量化
+     * @return 创建结果
+     */
+    Result<Template> createTemplateWithAutoIndex(Template template, boolean autoIndex);
+
+    /**
+     * 通过文件上传创建模板并自动触发向量化
+     * @param request 上传请求
+     * @param autoIndex 是否自动进行向量化
+     * @return 创建结果
+     */
+    Result<Template> createTemplateWithFileAndAutoIndex(TemplateUploadRequest request, boolean autoIndex);
 } 

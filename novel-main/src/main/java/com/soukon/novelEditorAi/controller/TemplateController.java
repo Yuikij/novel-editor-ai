@@ -43,6 +43,7 @@ public class TemplateController {
      * @param tags 模板标签
      * @param file 模板文件（文件和content至少提供一个）
      * @param content 模板内容文本（文件优先）
+     * @param autoIndex 是否自动进行向量化（可选，默认false）
      * @return 创建结果
      */
     @PostMapping("/upload")
@@ -50,9 +51,10 @@ public class TemplateController {
             @RequestParam(name = "name") String name,
             @RequestParam(name = "tags", required = false) String tags,
             @RequestParam(name = "file", required = false) MultipartFile file,
-            @RequestParam(name = "content", required = false) String content) {
-        log.info("创建模板请求, name: {}, tags: {}, hasFile: {}, hasContent: {}", 
-                name, tags, (file != null && !file.isEmpty()), StringUtils.hasText(content));
+            @RequestParam(name = "content", required = false) String content,
+            @RequestParam(name = "autoIndex", required = false, defaultValue = "false") Boolean autoIndex) {
+        log.info("创建模板请求, name: {}, tags: {}, hasFile: {}, hasContent: {}, autoIndex: {}", 
+                name, tags, (file != null && !file.isEmpty()), StringUtils.hasText(content), autoIndex);
         
         TemplateUploadRequest request = TemplateUploadRequest.builder()
                 .name(name)
@@ -61,7 +63,30 @@ public class TemplateController {
                 .content(content)
                 .build();
         
-        return templateService.createTemplateWithFile(request);
+        if (autoIndex) {
+            return templateService.createTemplateWithFileAndAutoIndex(request, true);
+        } else {
+            return templateService.createTemplateWithFile(request);
+        }
+    }
+
+    /**
+     * 创建模板（支持自动向量化）
+     * @param template 模板信息
+     * @param autoIndex 是否自动进行向量化（可选，默认false）
+     * @return 创建结果
+     */
+    @PostMapping("/with-auto-index")
+    public Result<Template> createTemplateWithAutoIndex(
+            @RequestBody Template template,
+            @RequestParam(name = "autoIndex", required = false, defaultValue = "false") Boolean autoIndex) {
+        log.info("创建模板请求（支持自动索引）: {}, autoIndex: {}", template, autoIndex);
+        
+        if (autoIndex) {
+            return templateService.createTemplateWithAutoIndex(template, true);
+        } else {
+            return templateService.createTemplate(template);
+        }
     }
 
     /**

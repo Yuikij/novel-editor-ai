@@ -25,6 +25,19 @@ public interface TemplateMapper extends BaseMapper<Template> {
     List<Template> selectByTag(@Param("tag") String tag);
     
     /**
+     * 根据ID查询模板基本信息（不包含content字段）
+     * @param id 模板ID
+     * @return 模板基本信息
+     * @deprecated 已被注解方案替代，建议使用 QueryUtils.fillSelect 配合相应的VO类：
+     *             - TemplateBasicVO: 向量化进度查询
+     *             - TemplateChatContextVO: 对话上下文查询  
+     *             - TemplateExistenceVO: 存在性检查
+     */
+    @Deprecated
+    @Select("SELECT id, name, tags, vector_status, vector_progress, vector_start_time, vector_end_time, vector_error_message FROM templates WHERE id = #{id}")
+    Template selectByIdWithoutContent(@Param("id") Long id);
+    
+    /**
      * 分页查询模板列表（不包含content字段）
      * @param page 分页参数
      * @param name 模板名称（可选）

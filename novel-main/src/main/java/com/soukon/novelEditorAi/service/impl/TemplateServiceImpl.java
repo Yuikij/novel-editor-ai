@@ -7,7 +7,11 @@ import com.soukon.novelEditorAi.entities.Template;
 import com.soukon.novelEditorAi.mapper.TemplateMapper;
 import com.soukon.novelEditorAi.model.template.TemplateListDTO;
 import com.soukon.novelEditorAi.model.template.TemplateUploadRequest;
+import com.soukon.novelEditorAi.model.template.TemplateBasicVO;
+import com.soukon.novelEditorAi.model.template.TemplateExistenceVO;
 import com.soukon.novelEditorAi.service.TemplateService;
+import com.soukon.novelEditorAi.service.TemplateVectorService;
+import com.soukon.novelEditorAi.utils.QueryUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -32,6 +36,9 @@ public class TemplateServiceImpl implements TemplateService {
 
     @Autowired
     private TemplateMapper templateMapper;
+
+    @Autowired
+    private TemplateVectorService templateVectorService;
 
     @Override
     public Result<Template> createTemplate(Template template) {
@@ -134,7 +141,11 @@ public class TemplateServiceImpl implements TemplateService {
             }
             
             // 检查模板是否存在
-            Template existingTemplate = templateMapper.selectById(template.getId());
+            LambdaQueryWrapper<Template> wrapper = new LambdaQueryWrapper<>();
+            QueryUtils.fillSelect(wrapper, Template.class, TemplateExistenceVO.class);
+            wrapper.eq(Template::getId, template.getId());
+            
+            Template existingTemplate = templateMapper.selectOne(wrapper);
             if (existingTemplate == null) {
                 return Result.error("模板不存在");
             }
@@ -203,7 +214,11 @@ public class TemplateServiceImpl implements TemplateService {
     public Result<Boolean> deleteTemplate(Long id) {
         try {
             // 检查模板是否存在
-            Template existingTemplate = templateMapper.selectById(id);
+            LambdaQueryWrapper<Template> wrapper = new LambdaQueryWrapper<>();
+            QueryUtils.fillSelect(wrapper, Template.class, TemplateExistenceVO.class);
+            wrapper.eq(Template::getId, id);
+            
+            Template existingTemplate = templateMapper.selectOne(wrapper);
             if (existingTemplate == null) {
                 return Result.error("模板不存在");
             }
@@ -343,6 +358,64 @@ public class TemplateServiceImpl implements TemplateService {
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
             return reader.lines().collect(Collectors.joining("\n"));
+        }
+    }
+
+    @Override
+    public Result<Template> createTemplateWithAutoIndex(Template template, boolean autoIndex) {
+        try {
+            // 先创建模板
+            Result<Template> createResult = createTemplate(template);
+            if (createResult.getCode() != 200) {
+                return createResult;
+            }
+            
+            Template createdTemplate = createResult.getData();
+            
+            // 如果需要自动索引且模板有内容
+            if (autoIndex && StringUtils.hasText(createdTemplate.getContent())) {
+                try {
+                    // 异步触发向量化
+                    templateVectorService.indexTemplateAsync(createdTemplate.getId());
+                    log.info("模板 {} 创建成功，已触发自动向量化", createdTemplate.getId());
+                } catch (Exception e) {
+                    log.warn("模板 {} 创建成功，但自动向量化失败: {}", createdTemplate.getId(), e.getMessage());
+                }
+            }
+            
+            return createResult;
+        } catch (Exception e) {
+            log.error("创建模板并自动索引失败: {}", e.getMessage(), e);
+            return Result.error("创建失败: " + e.getMessage());
+        }
+    }
+    
+    @Override
+    public Result<Template> createTemplateWithFileAndAutoIndex(TemplateUploadRequest request, boolean autoIndex) {
+        try {
+            // 先创建模板
+            Result<Template> createResult = createTemplateWithFile(request);
+            if (createResult.getCode() != 200) {
+                return createResult;
+            }
+            
+            Template createdTemplate = createResult.getData();
+            
+            // 如果需要自动索引且模板有内容
+            if (autoIndex && StringUtils.hasText(createdTemplate.getContent())) {
+                try {
+                    // 异步触发向量化
+                    templateVectorService.indexTemplateAsync(createdTemplate.getId());
+                    log.info("模板 {} 创建成功，已触发自动向量化", createdTemplate.getId());
+                } catch (Exception e) {
+                    log.warn("模板 {} 创建成功，但自动向量化失败: {}", createdTemplate.getId(), e.getMessage());
+                }
+            }
+            
+            return createResult;
+        } catch (Exception e) {
+            log.error("通过文件创建模板并自动索引失败: {}", e.getMessage(), e);
+            return Result.error("创建失败: " + e.getMessage());
         }
     }
 } 
