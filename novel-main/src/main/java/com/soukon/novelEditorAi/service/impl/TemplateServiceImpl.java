@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.soukon.novelEditorAi.common.Result;
 import com.soukon.novelEditorAi.entities.Template;
 import com.soukon.novelEditorAi.mapper.TemplateMapper;
+import com.soukon.novelEditorAi.model.template.TemplateListDTO;
 import com.soukon.novelEditorAi.model.template.TemplateUploadRequest;
 import com.soukon.novelEditorAi.service.TemplateService;
 import lombok.extern.slf4j.Slf4j;
@@ -295,6 +296,39 @@ public class TemplateServiceImpl implements TemplateService {
             return Result.success("查询成功", templates);
         } catch (Exception e) {
             log.error("根据标签查询模板失败: {}", e.getMessage(), e);
+            return Result.error("查询失败: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public Result<Page<TemplateListDTO>> pageTemplateList(int page, int size, String name, String tag) {
+        try {
+            // 分页参数
+            Page<TemplateListDTO> pageParam = new Page<>(page, size);
+            
+            // 执行分页查询（不包含content字段）
+            Page<TemplateListDTO> resultPage = templateMapper.selectPageWithoutContent(pageParam, name, tag);
+            
+            return Result.success("查询成功", resultPage);
+        } catch (Exception e) {
+            log.error("分页查询模板列表失败: {}", e.getMessage(), e);
+            return Result.error("查询失败: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public Result<List<TemplateListDTO>> getTemplateListByTag(String tag) {
+        try {
+            if (!StringUtils.hasText(tag)) {
+                return Result.error("标签不能为空");
+            }
+            
+            // 执行标签查询（不包含content字段）
+            List<TemplateListDTO> templates = templateMapper.selectByTagWithoutContent(tag);
+            
+            return Result.success("查询成功", templates);
+        } catch (Exception e) {
+            log.error("根据标签查询模板列表失败: {}", e.getMessage(), e);
             return Result.error("查询失败: " + e.getMessage());
         }
     }

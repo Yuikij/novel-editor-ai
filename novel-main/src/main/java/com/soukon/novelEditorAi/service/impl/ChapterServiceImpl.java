@@ -1,6 +1,7 @@
 package com.soukon.novelEditorAi.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -8,6 +9,7 @@ import com.soukon.novelEditorAi.entities.Chapter;
 import com.soukon.novelEditorAi.entities.OutlinePlotPoint;
 import com.soukon.novelEditorAi.entities.Project;
 import com.soukon.novelEditorAi.mapper.ChapterMapper;
+import com.soukon.novelEditorAi.model.chapter.ChapterListDTO;
 import com.soukon.novelEditorAi.service.*;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.chat.messages.Message;
@@ -381,5 +383,50 @@ public class ChapterServiceImpl extends ServiceImpl<ChapterMapper, Chapter> impl
         return input;
     }
 
+    @Override
+    public Page<ChapterListDTO> pageChapterList(int page, int size, Long projectId, String title, String status) {
+        try {
+            // 分页参数
+            Page<ChapterListDTO> pageParam = new Page<>(page, size);
+            
+            // 执行分页查询（不包含content和historyContent字段）
+            Page<ChapterListDTO> resultPage = chapterMapper.selectPageWithoutContent(pageParam, projectId, title, status);
+            
+            return resultPage;
+        } catch (Exception e) {
+            log.error("分页查询章节列表失败: {}", e.getMessage(), e);
+            throw new RuntimeException("查询失败: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public List<ChapterListDTO> getChapterListByProjectId(Long projectId) {
+        try {
+            if (projectId == null) {
+                throw new IllegalArgumentException("项目ID不能为空");
+            }
+            
+            // 执行查询（不包含content和historyContent字段）
+            List<ChapterListDTO> chapters = chapterMapper.selectListByProjectIdWithoutContent(projectId);
+            
+            return chapters;
+        } catch (Exception e) {
+            log.error("根据项目ID查询章节列表失败: {}", e.getMessage(), e);
+            throw new RuntimeException("查询失败: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public List<ChapterListDTO> getAllChapterList() {
+        try {
+            // 执行查询（不包含content和historyContent字段）
+            List<ChapterListDTO> chapters = chapterMapper.selectAllWithoutContent();
+            
+            return chapters;
+        } catch (Exception e) {
+            log.error("查询所有章节列表失败: {}", e.getMessage(), e);
+            throw new RuntimeException("查询失败: " + e.getMessage());
+        }
+    }
 
 } 

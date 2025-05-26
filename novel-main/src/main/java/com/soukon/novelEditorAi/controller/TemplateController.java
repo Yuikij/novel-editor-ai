@@ -3,6 +3,7 @@ package com.soukon.novelEditorAi.controller;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.soukon.novelEditorAi.common.Result;
 import com.soukon.novelEditorAi.entities.Template;
+import com.soukon.novelEditorAi.model.template.TemplateListDTO;
 import com.soukon.novelEditorAi.model.template.TemplateRequest;
 import com.soukon.novelEditorAi.model.template.TemplateUploadRequest;
 import com.soukon.novelEditorAi.service.TemplateService;
@@ -138,7 +139,18 @@ public class TemplateController {
     }
 
     /**
-     * 根据ID获取模板
+     * 根据ID获取模板详情（包含完整的content字段）
+     * @param id 模板ID
+     * @return 模板详情信息
+     */
+    @GetMapping("/{id}/detail")
+    public Result<Template> getTemplateDetail(@PathVariable(name = "id") Long id) {
+        log.info("查询模板详情请求, ID: {}", id);
+        return templateService.getTemplateById(id);
+    }
+
+    /**
+     * 根据ID获取模板基本信息（兼容旧接口，建议使用detail接口获取完整信息）
      * @param id 模板ID
      * @return 模板信息
      */
@@ -149,44 +161,92 @@ public class TemplateController {
     }
 
     /**
-     * 分页查询模板
+     * 分页查询模板列表（不包含content字段，推荐使用）
      * @param page 页码
      * @param size 每页大小
      * @param name 模板名称（可选）
      * @param tag 标签（可选）
      * @return 分页结果
      */
+    @GetMapping("/list")
+    public Result<Page<TemplateListDTO>> pageTemplateList(
+            @RequestParam(name = "page", defaultValue = "1") int page,
+            @RequestParam(name = "size", defaultValue = "10") int size,
+            @RequestParam(name = "name", required = false) String name,
+            @RequestParam(name = "tag", required = false) String tag) {
+        log.info("分页查询模板列表请求, page: {}, size: {}, name: {}, tag: {}", page, size, name, tag);
+        return templateService.pageTemplateList(page, size, name, tag);
+    }
+
+    /**
+     * 分页查询模板（包含content字段，不推荐在列表场景使用）
+     * @param page 页码
+     * @param size 每页大小
+     * @param name 模板名称（可选）
+     * @param tag 标签（可选）
+     * @return 分页结果
+     * @deprecated 建议使用 /list 接口，避免返回大的content字段
+     */
     @GetMapping("/page")
+    @Deprecated
     public Result<Page<Template>> pageTemplates(
             @RequestParam(name = "page", defaultValue = "1") int page,
             @RequestParam(name = "size", defaultValue = "10") int size,
             @RequestParam(name = "name", required = false) String name,
             @RequestParam(name = "tag", required = false) String tag) {
-        log.info("分页查询模板请求, page: {}, size: {}, name: {}, tag: {}", page, size, name, tag);
+        log.info("分页查询模板请求（已废弃）, page: {}, size: {}, name: {}, tag: {}", page, size, name, tag);
         return templateService.pageTemplates(page, size, name, tag);
     }
 
     /**
-     * 分页查询模板（使用请求体）
+     * 分页查询模板（使用请求体，推荐使用）
      * @param request 请求对象
      * @return 分页结果
      */
     @PostMapping("/search")
+    public Result<Page<TemplateListDTO>> searchTemplateList(@RequestBody TemplateRequest request) {
+        log.info("高级查询模板列表请求: {}", request);
+        Integer page = request.getPage() != null ? request.getPage() : 1;
+        Integer size = request.getSize() != null ? request.getSize() : 10;
+        return templateService.pageTemplateList(page, size, request.getName(), request.getTags());
+    }
+
+    /**
+     * 分页查询模板（使用请求体，包含content字段，不推荐）
+     * @param request 请求对象
+     * @return 分页结果
+     * @deprecated 建议使用 /search 接口，避免返回大的content字段
+     */
+    @PostMapping("/search-full")
+    @Deprecated
     public Result<Page<Template>> searchTemplates(@RequestBody TemplateRequest request) {
-        log.info("高级查询模板请求: {}", request);
+        log.info("高级查询模板请求（已废弃）: {}", request);
         Integer page = request.getPage() != null ? request.getPage() : 1;
         Integer size = request.getSize() != null ? request.getSize() : 10;
         return templateService.pageTemplates(page, size, request.getName(), request.getTags());
     }
 
     /**
-     * 根据标签查询模板
+     * 根据标签查询模板列表（不包含content字段，推荐使用）
      * @param tag 标签
      * @return 模板列表
      */
+    @GetMapping("/tag/{tag}/list")
+    public Result<List<TemplateListDTO>> getTemplateListByTag(@PathVariable(name = "tag") String tag) {
+        log.info("根据标签查询模板列表请求, tag: {}", tag);
+        return templateService.getTemplateListByTag(tag);
+    }
+
+    /**
+     * 根据标签查询模板（包含content字段，不推荐）
+     * @param tag 标签
+     * @return 模板列表
+     * @deprecated 建议使用 /tag/{tag}/list 接口，避免返回大的content字段
+     */
     @GetMapping("/tag/{tag}")
+    @Deprecated
     public Result<List<Template>> getTemplatesByTag(@PathVariable(name = "tag") String tag) {
-        log.info("根据标签查询模板请求, tag: {}", tag);
+        log.info("根据标签查询模板请求（已废弃）, tag: {}", tag);
         return templateService.getTemplatesByTag(tag);
     }
 } 

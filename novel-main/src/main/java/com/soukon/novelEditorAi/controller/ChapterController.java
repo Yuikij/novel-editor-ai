@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.soukon.novelEditorAi.common.Result;
 import com.soukon.novelEditorAi.entities.Chapter;
+import com.soukon.novelEditorAi.model.chapter.ChapterListDTO;
 import com.soukon.novelEditorAi.service.ChapterService;
 import com.soukon.novelEditorAi.model.chapter.ChapterContentRequest;
 import com.soukon.novelEditorAi.model.chapter.PlanContext;
@@ -45,13 +46,47 @@ public class ChapterController {
         this.chapterContentService = chapterContentService;
     }
 
+    /**
+     * 查询所有章节列表（不包含content和historyContent字段，推荐使用）
+     * @return 章节列表
+     */
+    @GetMapping("/list")
+    public Result<List<ChapterListDTO>> listChapters() {
+        List<ChapterListDTO> chapters = chapterService.getAllChapterList();
+        return Result.success(chapters);
+    }
+
+    /**
+     * 查询所有章节（包含content和historyContent字段，不推荐在列表场景使用）
+     * @return 章节列表
+     * @deprecated 建议使用 /list 接口，避免返回大的content字段
+     */
     @GetMapping
+    @Deprecated
     public Result<List<Chapter>> list() {
         List<Chapter> chapters = chapterService.list();
         return Result.success(chapters);
     }
 
+    /**
+     * 根据项目ID查询章节列表（不包含content和historyContent字段，推荐使用）
+     * @param projectId 项目ID
+     * @return 章节列表
+     */
+    @GetMapping("/project/{projectId}/list")
+    public Result<List<ChapterListDTO>> listChaptersByProjectId(@PathVariable("projectId") Long projectId) {
+        List<ChapterListDTO> chapters = chapterService.getChapterListByProjectId(projectId);
+        return Result.success(chapters);
+    }
+
+    /**
+     * 根据项目ID查询章节（包含content和historyContent字段，不推荐）
+     * @param projectId 项目ID
+     * @return 章节列表
+     * @deprecated 建议使用 /project/{projectId}/list 接口，避免返回大的content字段
+     */
     @GetMapping("/project/{projectId}")
+    @Deprecated
     public Result<List<Chapter>> listByProjectId(@PathVariable("projectId") Long projectId) {
         LambdaQueryWrapper<Chapter> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(Chapter::getProjectId, projectId);
@@ -60,8 +95,45 @@ public class ChapterController {
         return Result.success(chapters);
     }
 
+    /**
+     * 分页查询章节列表（不包含content和historyContent字段，推荐使用）
+     * @param page 页码
+     * @param pageSize 每页大小
+     * @param projectId 项目ID（可选）
+     * @param title 章节标题（可选）
+     * @param status 章节状态（可选）
+     * @return 分页结果
+     */
+    @GetMapping("/list/page")
+    public Result<Page<ChapterListDTO>> pageChapterList(
+            @RequestParam(value = "page", defaultValue = "1") Integer page, 
+            @RequestParam(value = "pageSize", defaultValue = "10") Integer pageSize, 
+            @RequestParam(value = "projectId", required = false) Long projectId, 
+            @RequestParam(value = "title", required = false) String title, 
+            @RequestParam(value = "status", required = false) String status) {
+        
+        Page<ChapterListDTO> pageInfo = chapterService.pageChapterList(page, pageSize, projectId, title, status);
+        return Result.success(pageInfo);
+    }
+
+    /**
+     * 分页查询章节（包含content和historyContent字段，不推荐在列表场景使用）
+     * @param page 页码
+     * @param pageSize 每页大小
+     * @param projectId 项目ID（可选）
+     * @param title 章节标题（可选）
+     * @param status 章节状态（可选）
+     * @return 分页结果
+     * @deprecated 建议使用 /list/page 接口，避免返回大的content字段
+     */
     @GetMapping("/page")
-    public Result<Page<Chapter>> page(@RequestParam(value = "page", defaultValue = "1", name = "page") Integer page, @RequestParam(value = "pageSize", defaultValue = "10", name = "pageSize") Integer pageSize, @RequestParam(value = "projectId", required = false, name = "projectId") Long projectId, @RequestParam(value = "title", required = false, name = "title") String title, @RequestParam(value = "status", required = false, name = "status") String status) {
+    @Deprecated
+    public Result<Page<Chapter>> page(
+            @RequestParam(value = "page", defaultValue = "1", name = "page") Integer page, 
+            @RequestParam(value = "pageSize", defaultValue = "10", name = "pageSize") Integer pageSize, 
+            @RequestParam(value = "projectId", required = false, name = "projectId") Long projectId, 
+            @RequestParam(value = "title", required = false, name = "title") String title, 
+            @RequestParam(value = "status", required = false, name = "status") String status) {
 
         Page<Chapter> pageInfo = new Page<>(page, pageSize);
         LambdaQueryWrapper<Chapter> queryWrapper = new LambdaQueryWrapper<>();
@@ -82,6 +154,25 @@ public class ChapterController {
         return Result.success(pageInfo);
     }
 
+    /**
+     * 根据ID获取章节详情（包含完整的content和historyContent字段）
+     * @param id 章节ID
+     * @return 章节详情信息
+     */
+    @GetMapping("/{id}/detail")
+    public Result<Chapter> getChapterDetail(@PathVariable("id") Long id) {
+        Chapter chapter = chapterService.getById(id);
+        if (chapter != null) {
+            return Result.success(chapter);
+        }
+        return Result.error("Chapter not found with id: " + id);
+    }
+
+    /**
+     * 根据ID获取章节基本信息（兼容旧接口，建议使用detail接口获取完整信息）
+     * @param id 章节ID
+     * @return 章节信息
+     */
     @GetMapping("/{id}")
     public Result<Chapter> getById(@PathVariable("id") Long id) {
         Chapter chapter = chapterService.getById(id);

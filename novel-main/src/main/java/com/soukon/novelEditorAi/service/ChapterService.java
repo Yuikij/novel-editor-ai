@@ -1,7 +1,9 @@
 package com.soukon.novelEditorAi.service;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.soukon.novelEditorAi.entities.Chapter;
+import com.soukon.novelEditorAi.model.chapter.ChapterListDTO;
 
 import java.util.List;
 
@@ -45,4 +47,28 @@ public interface ChapterService extends IService<Chapter> {
      * @return 补全后的章节列表（包含已有的和新生成的）
      */
     List<Chapter> expandChapters(Long projectId, List<Long> existingChapterIds, Integer targetCount);
+    
+    /**
+     * 分页查询章节列表（不包含content和historyContent字段）
+     * @param page 页码
+     * @param size 每页大小
+     * @param projectId 项目ID（可选）
+     * @param title 章节标题（可选）
+     * @param status 章节状态（可选）
+     * @return 分页结果
+     */
+    Page<ChapterListDTO> pageChapterList(int page, int size, Long projectId, String title, String status);
+    
+    /**
+     * 根据项目ID查询章节列表（不包含content和historyContent字段）
+     * @param projectId 项目ID
+     * @return 章节列表
+     */
+    List<ChapterListDTO> getChapterListByProjectId(Long projectId);
+    
+    /**
+     * 查询所有章节列表（不包含content和historyContent字段）
+     * @return 章节列表
+     */
+    List<ChapterListDTO> getAllChapterList();
 }
