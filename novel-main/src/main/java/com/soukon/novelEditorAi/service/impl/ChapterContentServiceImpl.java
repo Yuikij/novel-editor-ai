@@ -3,6 +3,7 @@ package com.soukon.novelEditorAi.service.impl;
 import com.alibaba.nacos.common.utils.UuidUtils;
 import com.soukon.novelEditorAi.agent.AgentState;
 import com.soukon.novelEditorAi.agent.WritingAgent;
+import com.soukon.novelEditorAi.agent.EnhancedWritingAgent;
 import com.soukon.novelEditorAi.common.Result;
 import com.soukon.novelEditorAi.entities.Chapter;
 import com.soukon.novelEditorAi.entities.Project;
@@ -327,7 +328,7 @@ public class ChapterContentServiceImpl implements ChapterContentService {
     public void generateChapterContentStreamFlux(ChapterContentRequest request) {
 
         // 第一阶段：Reasoning - 理解和分析需求
-        log.info("[Reasoning] 开始分析章节内容生成需求");
+        log.info("[Enhanced Reasoning] 开始分析章节内容生成需求");
 
         // 验证请求参数
         validateRequest(request);
@@ -338,19 +339,27 @@ public class ChapterContentServiceImpl implements ChapterContentService {
 
         // 设置默认参数
         if (request.getMaxTokens() == null) {
-            // 设置一个合理的默认 token 上限，防止生成过长内容
             request.setMaxTokens(defaultMaxTokens);
         } else if (request.getMaxTokens() > 4000) {
-            // 限制最大 token 数，即使用户请求更多也进行控制
-            log.warn("[Reasoning] 请求的 token 数过大，已限制为 4000");
+            log.warn("[Enhanced Reasoning] 请求的 token 数过大，已限制为 4000");
             request.setMaxTokens(4000);
         }
         if (request.getTemperature() == null) {
             request.setTemperature(defaultTemperature);
         }
 
-        // 构建推理指导提示词 - 使用PromptService
-        List<Message> reasoningMessages = promptService.buildReasoningPrompt(request);
+        // 使用增强版提示词服务构建计划提示词
+        EnhancedPromptServiceImpl enhancedPromptService = new EnhancedPromptServiceImpl(
+            this.projectService,
+            this.chapterService,
+            this.worldService,
+            this.characterService,
+            this.plotService,
+            this.characterRelationshipService,
+            this.outlinePlotPointService
+        );
+        
+        List<Message> reasoningMessages = enhancedPromptService.buildEnhancedPlanningPrompt(request);
 
         // 执行推理过程，分析章节要求并制定写作计划
         String reasoningResult;
@@ -358,19 +367,19 @@ public class ChapterContentServiceImpl implements ChapterContentService {
         PlanContext planContext = request.getPlanContext();
         try {
             BeanOutputConverter<PlanRes> converter = new BeanOutputConverter<>(PlanRes.class);
-            log.info("[Reasoning] 正在分析章节要求并制定写作计划");
+            log.info("[Enhanced Reasoning] 正在分析章节要求并制定高质量写作计划");
 
             reasoningResult = llmService.getAgentChatClient(planContext.getPlanId()).getChatClient()
                     .prompt(new Prompt(reasoningMessages)).call().content();
-            log.info("[Reasoning] 完成章节分析和写作计划原数据: {}", reasoningResult);
+            log.info("[Enhanced Reasoning] 完成章节分析和写作计划原数据: {}", reasoningResult);
             planRes = reasoningResult == null ? null : converter.convert(reasoningResult);
-            log.info("[Reasoning] 完成章节分析和写作计划: {}", planRes);
+            log.info("[Enhanced Reasoning] 完成章节分析和写作计划: {}", planRes);
         } catch (Exception e) {
-            log.error("[Reasoning] 章节分析失败: {}", e.getMessage(), e);
+            log.error("[Enhanced Reasoning] 章节分析失败: {}", e.getMessage(), e);
             throw new RuntimeException("分析章节要求失败：" + e.getMessage(), e);
         }
         if (planRes == null) {
-            log.error("[Reasoning] 章节分析结果为空");
+            log.error("[Enhanced Reasoning] 章节分析结果为空");
             throw new RuntimeException("分析章节要求失败：结果为空");
         }
 
@@ -381,49 +390,44 @@ public class ChapterContentServiceImpl implements ChapterContentService {
             plotService.updateById(plot);
         }
 
-        // 第二阶段：Acting - 根据分析结果执行写作
-        log.info("[Planing] 开始根据分析结果生成章节内容");
+        // 第二阶段：Enhanced Acting - 使用增强版写作代理执行写作
+        log.info("[Enhanced Acting] 开始使用增强版写作代理生成章节内容");
         List<PlanDetailRes> planList = planRes.getPlanList();
         if (planList == null || planList.isEmpty()) {
-            log.error("[Planing] 章节计划列表为空");
+            log.error("[Enhanced Acting] 章节计划列表为空");
             throw new RuntimeException("生成章节内容失败：计划列表为空");
         }
 
-        // 使用WritingAgent执行写作计划
-        log.info("[Planing] 使用ReAct方式生成章节内容，计划步骤数: {}", planList.size());
-        WritingAgent writingAgent = new WritingAgent(this.llmService, request);
-        writingAgent.setPlanId(planContext.getPlanId());
+        // 使用增强版WritingAgent执行写作计划
+        log.info("[Enhanced Acting] 使用增强版写作代理生成章节内容，计划步骤数: {}", planList.size());
+        
+        // 创建增强版写作代理
+        EnhancedWritingAgent enhancedWritingAgent = new EnhancedWritingAgent(this.llmService, request);
+        
         planContext.setPlanState(PlanState.IN_PROGRESS);
-        planContext.setMessage("已完成计划设计，总目标" + planRes.getGoal());
+        planContext.setMessage("已完成高质量计划设计，总目标：" + planRes.getGoal());
         planContext.setProgress(10);
         request.setPlan(planRes.toString());
 
+        // 转换PlanDetailRes列表
+        List<EnhancedWritingAgent.PlanDetailRes> enhancedPlanList = new ArrayList<>();
+        for (PlanDetailRes originalPlan : planList) {
+            enhancedPlanList.add(new EnhancedWritingAgent.PlanDetailRes(
+                originalPlan.getGoalWordCount(), 
+                originalPlan.getPlanContent()
+            ));
+        }
 
-        List<Long> itemIds = plot.getItemIds();
-        String itemsPrompt = "无";
-        if (itemIds != null && !itemIds.isEmpty()) {
-            itemsPrompt = itemService.getItemsPrompt(itemIds);
+        // 执行增强版写作计划
+        try {
+            enhancedWritingAgent.executeWritingPlan(enhancedPlanList);
+        } catch (Exception e) {
+            log.error("[Enhanced Acting] 增强版写作执行失败", e);
+            planContext.setPlanState(PlanState.COMPLETED);
+            planContext.setMessage("写作失败：" + e.getMessage());
+            throw new RuntimeException("增强版写作执行失败", e);
         }
-        // 使用Flux合并所有步骤的内容
-        int index = 1;
-        for (PlanDetailRes planStep : planList) {
-            log.info("[Planing] 执行写作计划步骤: {}", planStep);
-            planContext.setMessage("正在执行写作计划步骤：" + planStep.getPlanContent());
-            planContext.setProgress(10 + (index-1) * 90 / planList.size());
-            writingAgent.setState(AgentState.IN_PROGRESS);
-            Map<String, Object> executorParams = new HashMap<>();
-            executorParams.put("stepContent", planStep.getPlanContent());
-            executorParams.put("goalWordCount", planStep.getGoalWordCount());
-            executorParams.put("stepNumber", index++);
-            executorParams.put("goal", planRes.getGoal());
-            executorParams.put("character", plotService.toCharacter(plot));
-            executorParams.put("plot", plot.getDescription());
-            executorParams.put("promptSuggestion", request.getPromptSuggestion());
-            if (itemsPrompt != null) {
-                executorParams.put("itemsPrompt", itemsPrompt);
-            }
-            writingAgent.run(executorParams);
-        }
+        
         llmService.removeAgentChatClient(planContext.getPlanId());
     }
 } 
