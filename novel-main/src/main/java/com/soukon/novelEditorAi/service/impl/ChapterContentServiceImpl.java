@@ -73,7 +73,7 @@ public class ChapterContentServiceImpl implements ChapterContentService {
     private final CharacterRelationshipService characterRelationshipService;
     private final OutlinePlotPointService outlinePlotPointService;
     @Autowired
-    private  ItemService itemService;
+    private ItemService itemService;
 
     @Getter
     private ConcurrentHashMap<String, PlanContext> planContextMap = new ConcurrentHashMap<>();
@@ -350,15 +350,15 @@ public class ChapterContentServiceImpl implements ChapterContentService {
 
         // 使用增强版提示词服务构建计划提示词
         EnhancedPromptServiceImpl enhancedPromptService = new EnhancedPromptServiceImpl(
-            this.projectService,
-            this.chapterService,
-            this.worldService,
-            this.characterService,
-            this.plotService,
-            this.characterRelationshipService,
-            this.outlinePlotPointService
+                this.projectService,
+                this.chapterService,
+                this.worldService,
+                this.characterService,
+                this.plotService,
+                this.characterRelationshipService,
+                this.outlinePlotPointService
         );
-        
+
         List<Message> reasoningMessages = enhancedPromptService.buildEnhancedPlanningPrompt(request);
 
         // 执行推理过程，分析章节要求并制定写作计划
@@ -367,7 +367,7 @@ public class ChapterContentServiceImpl implements ChapterContentService {
         PlanContext planContext = request.getPlanContext();
         try {
             BeanOutputConverter<PlanRes> converter = new BeanOutputConverter<>(PlanRes.class);
-            log.info("[Enhanced Reasoning] 正在分析章节要求并制定高质量写作计划");
+            log.info("[Enhanced Reasoning] 正在分析章节要求并制定高质量写作计划:{}", reasoningMessages);
 
             reasoningResult = llmService.getAgentChatClient(planContext.getPlanId()).getChatClient()
                     .prompt(new Prompt(reasoningMessages)).call().content();
@@ -385,8 +385,9 @@ public class ChapterContentServiceImpl implements ChapterContentService {
 
         // 将planRes的completePercent保存到数据库
         Plot plot = request.getCurrentPlot();
-        if (!request.isFreedom()){
+        if (!request.isFreedom()) {
             plot.setCompletionPercentage(100);
+            request.setWordCountSuggestion(plot.getWordCountGoal());
             plotService.updateById(plot);
         }
 
@@ -400,10 +401,10 @@ public class ChapterContentServiceImpl implements ChapterContentService {
 
         // 使用增强版WritingAgent执行写作计划
         log.info("[Enhanced Acting] 使用增强版写作代理生成章节内容，计划步骤数: {}", planList.size());
-        
+
         // 创建增强版写作代理
         EnhancedWritingAgent enhancedWritingAgent = new EnhancedWritingAgent(this.llmService, request);
-        
+
         planContext.setPlanState(PlanState.IN_PROGRESS);
         planContext.setMessage("已完成高质量计划设计，总目标：" + planRes.getGoal());
         planContext.setProgress(10);
@@ -413,8 +414,8 @@ public class ChapterContentServiceImpl implements ChapterContentService {
         List<EnhancedWritingAgent.PlanDetailRes> enhancedPlanList = new ArrayList<>();
         for (PlanDetailRes originalPlan : planList) {
             enhancedPlanList.add(new EnhancedWritingAgent.PlanDetailRes(
-                originalPlan.getGoalWordCount(), 
-                originalPlan.getPlanContent()
+                    originalPlan.getGoalWordCount(),
+                    originalPlan.getPlanContent()
             ));
         }
 
@@ -427,7 +428,7 @@ public class ChapterContentServiceImpl implements ChapterContentService {
             planContext.setMessage("写作失败：" + e.getMessage());
             throw new RuntimeException("增强版写作执行失败", e);
         }
-        
+
         llmService.removeAgentChatClient(planContext.getPlanId());
     }
 } 
