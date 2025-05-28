@@ -164,7 +164,10 @@ public abstract class BaseAgent {
         this.llmService = llmService;
         this.maxSteps = 5;
         this.chapterContentRequest = request;
-        this.planId = request.getPlanContext().getPlanId();
+        // 安全地获取planId
+        if (request.getPlanContext() != null) {
+            this.planId = request.getPlanContext().getPlanId();
+        }
     }
 
     public void run(Map<String, Object> stepData) {

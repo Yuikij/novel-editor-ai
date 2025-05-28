@@ -4,6 +4,8 @@ import com.alibaba.nacos.common.utils.UuidUtils;
 import com.soukon.novelEditorAi.agent.AgentState;
 import com.soukon.novelEditorAi.agent.WritingAgent;
 import com.soukon.novelEditorAi.agent.EnhancedWritingAgent;
+import com.soukon.novelEditorAi.agent.RagEnhancedWritingAgent;
+import com.soukon.novelEditorAi.agent.tool.WritingToolManager;
 import com.soukon.novelEditorAi.common.Result;
 import com.soukon.novelEditorAi.entities.Chapter;
 import com.soukon.novelEditorAi.entities.Project;
@@ -72,19 +74,21 @@ public class ChapterContentServiceImpl implements ChapterContentService {
     private final PlotService plotService;
     private final CharacterRelationshipService characterRelationshipService;
     private final OutlinePlotPointService outlinePlotPointService;
-    @Autowired
-    private ItemService itemService;
 
     @Getter
     private ConcurrentHashMap<String, PlanContext> planContextMap = new ConcurrentHashMap<>();
 
+    @Autowired
+    private ItemService itemService;
+
+    @Autowired
+    private WritingToolManager writingToolManager;
 
     @Autowired
     private LlmService llmService;
 
     @Value("${novel.chapter.default-max-tokens:2000}")
     private Integer defaultMaxTokens;
-
 
     @Value("${novel.chapter.default-temperature:0.7}")
     private Float defaultTemperature;
@@ -328,7 +332,7 @@ public class ChapterContentServiceImpl implements ChapterContentService {
     public void generateChapterContentStreamFlux(ChapterContentRequest request) {
 
         // 第一阶段：Reasoning - 理解和分析需求
-        log.info("[Enhanced Reasoning] 开始分析章节内容生成需求");
+        log.info("[RAG增强写作] 开始分析章节内容生成需求");
 
         // 验证请求参数
         validateRequest(request);
@@ -341,15 +345,23 @@ public class ChapterContentServiceImpl implements ChapterContentService {
         if (request.getMaxTokens() == null) {
             request.setMaxTokens(defaultMaxTokens);
         } else if (request.getMaxTokens() > 4000) {
-            log.warn("[Enhanced Reasoning] 请求的 token 数过大，已限制为 4000");
+            log.warn("[RAG增强写作] 请求的 token 数过大，已限制为 4000");
             request.setMaxTokens(4000);
         }
         if (request.getTemperature() == null) {
             request.setTemperature(defaultTemperature);
         }
 
-        // 使用增强版提示词服务构建计划提示词
-        EnhancedPromptServiceImpl enhancedPromptService = new EnhancedPromptServiceImpl(
+        // 生成计划ID
+        String planId = UuidUtils.generateUuid();
+        PlanContext planContext = new PlanContext(planId);
+        request.setPlanContext(planContext);
+
+        log.info("[RAG增强写作] 计划ID: {}", planId);
+
+        try {
+            // 使用增强版提示词服务构建计划提示词
+            EnhancedPromptServiceImpl enhancedPromptService = new EnhancedPromptServiceImpl(
                 this.projectService,
                 this.chapterService,
                 this.worldService,
@@ -357,78 +369,83 @@ public class ChapterContentServiceImpl implements ChapterContentService {
                 this.plotService,
                 this.characterRelationshipService,
                 this.outlinePlotPointService
-        );
+            );
+            
+            List<Message> reasoningMessages = enhancedPromptService.buildEnhancedPlanningPrompt(request);
 
-        List<Message> reasoningMessages = enhancedPromptService.buildEnhancedPlanningPrompt(request);
+            // 第二阶段：Planning - 制定写作计划
+            log.info("[RAG增强写作] 开始制定写作计划");
+            
+            BeanOutputConverter<PlanRes> planConverter = new BeanOutputConverter<>(PlanRes.class);
+            Prompt planPrompt = new Prompt(reasoningMessages, 
+                    OpenAiChatOptions.builder()
+                            .temperature(request.getTemperature().doubleValue())
+                            .maxTokens(request.getMaxTokens())
+                            .build());
 
-        // 执行推理过程，分析章节要求并制定写作计划
-        String reasoningResult;
-        PlanRes planRes;
-        PlanContext planContext = request.getPlanContext();
-        try {
-            BeanOutputConverter<PlanRes> converter = new BeanOutputConverter<>(PlanRes.class);
-            log.info("[Enhanced Reasoning] 正在分析章节要求并制定高质量写作计划:{}", reasoningMessages);
+            String planResponse = llmService.getAgentChatClient(planId).getChatClient()
+                    .prompt(planPrompt).call().content();
+            log.info("[RAG增强写作] 计划生成响应: {}", planResponse);
 
-            reasoningResult = llmService.getAgentChatClient(planContext.getPlanId()).getChatClient()
-                    .prompt(new Prompt(reasoningMessages)).call().content();
-            log.info("[Enhanced Reasoning] 完成章节分析和写作计划原数据: {}", reasoningResult);
-            planRes = reasoningResult == null ? null : converter.convert(reasoningResult);
-            log.info("[Enhanced Reasoning] 完成章节分析和写作计划: {}", planRes);
+            PlanRes planRes = planConverter.convert(planResponse);
+            if (planRes == null || planRes.getPlanList() == null || planRes.getPlanList().isEmpty()) {
+                log.error("[RAG增强写作] 计划生成失败或为空");
+                planContext.setPlanState(PlanState.COMPLETED);
+                planContext.setMessage("计划生成失败");
+                return;
+            }
+
+            log.info("[RAG增强写作] 计划制定完成，共 {} 个步骤", planRes.getPlanList().size());
+
+            // 第三阶段：Execution - 使用RAG增强写作代理执行写作
+            log.info("[RAG增强写作] 开始执行写作计划");
+            
+            // 创建RAG增强写作代理
+            RagEnhancedWritingAgent ragAgent = new RagEnhancedWritingAgent(
+                llmService, 
+                writingToolManager, 
+                chatClient, 
+                request
+            );
+            
+            // 设置计划ID
+            ragAgent.setPlanId(planId);
+
+            // 执行写作流程
+            Flux<String> contentStream = ragAgent.executeWritingPlan(
+                request, 
+                reasoningMessages, 
+                planContext, 
+                planRes.getPlanList()
+            );
+
+            // 设置流式响应并立即订阅以触发执行
+            planContext.setPlanStream(contentStream);
+            planContext.setPlanState(PlanState.GENERATING);
+            
+            // 立即订阅流以触发执行（冷流需要订阅才会执行）
+            contentStream.subscribe(
+                content -> {
+                    log.debug("[RAG增强写作] 生成内容片段: {}", content.length() > 50 ? content.substring(0, 50) + "..." : content);
+                },
+                error -> {
+                    log.error("[RAG增强写作] 内容生成失败", error);
+                    planContext.setPlanState(PlanState.COMPLETED);
+                    planContext.setMessage("生成失败: " + error.getMessage());
+                },
+                () -> {
+                    log.info("[RAG增强写作] 内容生成完成");
+                    planContext.setPlanState(PlanState.COMPLETED);
+                    planContext.setMessage("生成完成");
+                }
+            );
+
+            log.info("[RAG增强写作] 写作流程启动完成");
+
         } catch (Exception e) {
-            log.error("[Enhanced Reasoning] 章节分析失败: {}", e.getMessage(), e);
-            throw new RuntimeException("分析章节要求失败：" + e.getMessage(), e);
-        }
-        if (planRes == null) {
-            log.error("[Enhanced Reasoning] 章节分析结果为空");
-            throw new RuntimeException("分析章节要求失败：结果为空");
-        }
-
-        // 将planRes的completePercent保存到数据库
-        Plot plot = request.getCurrentPlot();
-        if (!request.isFreedom()) {
-            plot.setCompletionPercentage(100);
-            request.setWordCountSuggestion(plot.getWordCountGoal());
-            plotService.updateById(plot);
-        }
-
-        // 第二阶段：Enhanced Acting - 使用增强版写作代理执行写作
-        log.info("[Enhanced Acting] 开始使用增强版写作代理生成章节内容");
-        List<PlanDetailRes> planList = planRes.getPlanList();
-        if (planList == null || planList.isEmpty()) {
-            log.error("[Enhanced Acting] 章节计划列表为空");
-            throw new RuntimeException("生成章节内容失败：计划列表为空");
-        }
-
-        // 使用增强版WritingAgent执行写作计划
-        log.info("[Enhanced Acting] 使用增强版写作代理生成章节内容，计划步骤数: {}", planList.size());
-
-        // 创建增强版写作代理
-        EnhancedWritingAgent enhancedWritingAgent = new EnhancedWritingAgent(this.llmService, request);
-
-        planContext.setPlanState(PlanState.IN_PROGRESS);
-        planContext.setMessage("已完成高质量计划设计，总目标：" + planRes.getGoal());
-        planContext.setProgress(10);
-        request.setPlan(planRes.toString());
-
-        // 转换PlanDetailRes列表
-        List<EnhancedWritingAgent.PlanDetailRes> enhancedPlanList = new ArrayList<>();
-        for (PlanDetailRes originalPlan : planList) {
-            enhancedPlanList.add(new EnhancedWritingAgent.PlanDetailRes(
-                    originalPlan.getGoalWordCount(),
-                    originalPlan.getPlanContent()
-            ));
-        }
-
-        // 执行增强版写作计划
-        try {
-            enhancedWritingAgent.executeWritingPlan(enhancedPlanList);
-        } catch (Exception e) {
-            log.error("[Enhanced Acting] 增强版写作执行失败", e);
+            log.error("[RAG增强写作] 执行失败", e);
             planContext.setPlanState(PlanState.COMPLETED);
-            planContext.setMessage("写作失败：" + e.getMessage());
-            throw new RuntimeException("增强版写作执行失败", e);
+            planContext.setMessage("执行失败: " + e.getMessage());
         }
-
-        llmService.removeAgentChatClient(planContext.getPlanId());
     }
 } 
