@@ -1,146 +1,104 @@
 package com.soukon.novelEditorAi.agent.tool;
 
-import com.soukon.novelEditorAi.mapper.CharacterMapper;
-import com.soukon.novelEditorAi.service.PlotService;
-import com.soukon.novelEditorAi.service.RagService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.tool.ToolCallback;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 写作工具管理器
- * 统一管理所有写作相关的工具
+ * 管理所有可用的写作工具
  */
 @Component
 @Slf4j
 public class WritingToolManager {
     
-    private final CharacterMapper characterMapper;
-    private final PlotService plotService;
-    private final RagService ragService;
+    private final CharacterQueryTool characterQueryTool;
+    private final PlotQueryTool plotQueryTool;
+    private final RagSearchTool ragSearchTool;
     
-    // 工具实例缓存
-    private final Map<String, WritingToolCallback> toolInstances = new HashMap<>();
+    private final ConcurrentHashMap<String, String> planToolStates = new ConcurrentHashMap<>();
     
-    @Autowired
-    public WritingToolManager(CharacterMapper characterMapper, 
-                             PlotService plotService, 
-                             RagService ragService) {
-        this.characterMapper = characterMapper;
-        this.plotService = plotService;
-        this.ragService = ragService;
+    public WritingToolManager(CharacterQueryTool characterQueryTool,
+                             PlotQueryTool plotQueryTool,
+                             RagSearchTool ragSearchTool) {
+        this.characterQueryTool = characterQueryTool;
+        this.plotQueryTool = plotQueryTool;
+        this.ragSearchTool = ragSearchTool;
         
-        initializeTools();
+        log.info("写作工具管理器初始化完成，加载了 3 个工具");
     }
     
     /**
-     * 初始化所有工具
+     * 获取所有工具实例
      */
-    private void initializeTools() {
-        // 角色查询工具
-        CharacterQueryTool characterQueryTool = new CharacterQueryTool(characterMapper);
-        toolInstances.put(characterQueryTool.getName(), characterQueryTool);
-        
-        // 情节查询工具
-        PlotQueryTool plotQueryTool = new PlotQueryTool(plotService);
-        toolInstances.put(plotQueryTool.getName(), plotQueryTool);
-        
-        // RAG搜索工具
-        RagSearchTool ragSearchTool = new RagSearchTool(ragService);
-        toolInstances.put(ragSearchTool.getName(), ragSearchTool);
-        
-        log.info("写作工具管理器初始化完成，共加载 {} 个工具", toolInstances.size());
+    public List<Object> getAllTools() {
+        return List.of(characterQueryTool, plotQueryTool, ragSearchTool);
     }
     
     /**
-     * 获取所有可用的工具回调
+     * 为特定计划设置工具状态
      */
-    public List<ToolCallback> getAllToolCallbacks(String planId) {
-        List<ToolCallback> callbacks = new ArrayList<>();
+    public void initializeForPlan(String planId) {
+        try {
+            characterQueryTool.setPlanId(planId);
+            plotQueryTool.setPlanId(planId);
+            ragSearchTool.setPlanId(planId);
+            
+            log.info("为计划 {} 初始化工具状态", planId);
+        } catch (Exception e) {
+            log.error("初始化计划 {} 的工具状态失败", planId, e);
+        }
+    }
+    
+    /**
+     * 获取工具状态摘要
+     */
+    public String getToolStateSummary(String planId) {
+        StringBuilder summary = new StringBuilder();
+        summary.append("=== 工具状态摘要 ===\n");
         
-        for (WritingToolCallback tool : toolInstances.values()) {
-            try {
-                // 设置计划ID
-                tool.setPlanId(planId);
-                
-                // 转换为Spring AI的ToolCallback
-                ToolCallback callback = tool.toSpringAiToolCallback();
-                callbacks.add(callback);
-                
-                log.debug("已加载工具: {}", tool.getName());
-            } catch (Exception e) {
-                log.error("加载工具 {} 失败: {}", tool.getName(), e.getMessage(), e);
-            }
+        try {
+            summary.append("角色查询工具: ").append(characterQueryTool.getCurrentToolState()).append("\n");
+            summary.append("情节查询工具: ").append(plotQueryTool.getCurrentToolState()).append("\n");
+            summary.append("RAG搜索工具: ").append(ragSearchTool.getCurrentToolState()).append("\n");
+        } catch (Exception e) {
+            log.warn("获取工具状态摘要失败", e);
+            summary.append("获取状态失败: ").append(e.getMessage()).append("\n");
         }
         
-        log.info("为计划 {} 加载了 {} 个工具回调", planId, callbacks.size());
-        return callbacks;
+        return summary.toString();
     }
     
     /**
-     * 获取指定名称的工具
+     * 清理计划相关的工具状态
      */
-    public WritingToolCallback getTool(String toolName) {
-        return toolInstances.get(toolName);
-    }
-    
-    /**
-     * 获取所有工具名称
-     */
-    public List<String> getAllToolNames() {
-        return new ArrayList<>(toolInstances.keySet());
-    }
-    
-    /**
-     * 清理指定计划的工具资源
-     */
-    public void cleanupTools(String planId) {
-        for (WritingToolCallback tool : toolInstances.values()) {
-            try {
-                tool.cleanup(planId);
-            } catch (Exception e) {
-                log.error("清理工具 {} 资源失败: {}", tool.getName(), e.getMessage(), e);
-            }
+    public void cleanupPlan(String planId) {
+        try {
+            characterQueryTool.cleanup(planId);
+            plotQueryTool.cleanup(planId);
+            ragSearchTool.cleanup(planId);
+            
+            planToolStates.remove(planId);
+            
+            log.info("清理计划 {} 的工具状态完成", planId);
+        } catch (Exception e) {
+            log.error("清理计划 {} 的工具状态失败", planId, e);
         }
-        log.info("已清理计划 {} 的工具资源", planId);
     }
     
     /**
-     * 获取工具状态信息
+     * 获取工具数量
      */
-    public Map<String, String> getToolStates() {
-        Map<String, String> states = new HashMap<>();
-        for (WritingToolCallback tool : toolInstances.values()) {
-            try {
-                states.put(tool.getName(), tool.getCurrentToolState());
-            } catch (Exception e) {
-                states.put(tool.getName(), "获取状态失败: " + e.getMessage());
-            }
-        }
-        return states;
+    public int getToolCount() {
+        return 3;
     }
     
     /**
      * 检查工具是否可用
      */
-    public boolean isToolAvailable(String toolName) {
-        return toolInstances.containsKey(toolName);
-    }
-    
-    /**
-     * 获取工具描述信息
-     */
-    public Map<String, String> getToolDescriptions() {
-        Map<String, String> descriptions = new HashMap<>();
-        for (WritingToolCallback tool : toolInstances.values()) {
-            descriptions.put(tool.getName(), tool.getDescription());
-        }
-        return descriptions;
+    public boolean isToolsAvailable() {
+        return characterQueryTool != null && plotQueryTool != null && ragSearchTool != null;
     }
 } 

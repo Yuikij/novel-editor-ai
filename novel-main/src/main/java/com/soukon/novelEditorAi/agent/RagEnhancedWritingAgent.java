@@ -80,14 +80,15 @@ public class RagEnhancedWritingAgent extends BaseAgent {
                     currentStep.getPlanContent() != null ? currentStep.getPlanContent() : "写作任务");
             
             // 获取所有可用的工具
-            List<ToolCallback> tools = toolManager.getAllToolCallbacks(planId);
+            toolManager.initializeForPlan(planId);
+            List<Object> tools = toolManager.getAllTools();
             
             // 构建增强的系统提示词
             String enhancedSystemPrompt = buildEnhancedSystemPrompt();
             
             // 创建带工具的ChatClient
             ChatClient toolEnabledClient = chatClient.mutate()
-                    .defaultTools(tools.toArray(new ToolCallback[0]))
+                    .defaultTools(tools.toArray())
                     .build();
             
             // 构建任务描述
@@ -138,8 +139,11 @@ public class RagEnhancedWritingAgent extends BaseAgent {
             try {
                 log.info("[RAG增强写作] 开始执行写作计划，计划ID: {}", planId);
                 
+                // 初始化工具状态
+                toolManager.initializeForPlan(planId);
+                
                 // 获取所有可用的工具
-                List<ToolCallback> tools = toolManager.getAllToolCallbacks(planId);
+                List<Object> tools = toolManager.getAllTools();
                 log.info("[RAG增强写作] 加载了 {} 个工具", tools.size());
                 
                 // 构建增强的系统提示词
@@ -147,7 +151,7 @@ public class RagEnhancedWritingAgent extends BaseAgent {
                 
                 // 创建带工具的ChatClient
                 ChatClient toolEnabledClient = chatClient.mutate()
-                        .defaultTools(tools.toArray(new ToolCallback[0]))
+                        .defaultTools(tools.toArray())
                         .build();
                 
                 // 执行写作流程
@@ -234,7 +238,7 @@ public class RagEnhancedWritingAgent extends BaseAgent {
                     () -> {
                         log.info("[RAG增强写作] 内容生成完成");
                         // 清理工具资源
-                        toolManager.cleanupTools(planId);
+                        toolManager.cleanupPlan(planId);
                         sink.complete();
                     }
             );
