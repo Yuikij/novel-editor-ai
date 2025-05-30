@@ -33,7 +33,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class LlmService {
 
     private static final String PLANNING_SYSTEM_PROMPT = """
-            
+                        
             你是一位经验丰富、才华横溢且极具责任心的小说创作大师。你的任务是与用户协作，创作出引人入胜、逻辑严谨、情感丰富且具有高度原创性的文学作品。
                         
             **核心原则与行为准则：**
@@ -102,9 +102,7 @@ public class LlmService {
     // private final ChatClient chatClient;
 
 
-
     private final ChatClient planningChatClient;
-
 
 
     private final ChatClient finalizeChatClient;
@@ -155,7 +153,7 @@ public class LlmService {
                     .defaultSystem(PLANNING_SYSTEM_PROMPT)
                     .defaultAdvisors(new SimpleLoggerAdvisor())
                     .defaultOptions(
-                            OpenAiChatOptions.builder().temperature(0.6).build())
+                            OpenAiChatOptions.builder().frequencyPenalty(2.0).temperature(0.8).build())
                     .build();
             return new AgentChatClientWrapper(agentChatClient, null);
         });
