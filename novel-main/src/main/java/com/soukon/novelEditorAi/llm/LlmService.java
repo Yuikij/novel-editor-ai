@@ -153,7 +153,7 @@ public class LlmService {
                     .defaultSystem(PLANNING_SYSTEM_PROMPT)
                     .defaultAdvisors(new SimpleLoggerAdvisor())
                     .defaultOptions(
-                            OpenAiChatOptions.builder().frequencyPenalty(2.0).temperature(0.8).build())
+                            OpenAiChatOptions.builder().frequencyPenalty(1.0).temperature(0.6).build())
                     .build();
             return new AgentChatClientWrapper(agentChatClient, null);
         });

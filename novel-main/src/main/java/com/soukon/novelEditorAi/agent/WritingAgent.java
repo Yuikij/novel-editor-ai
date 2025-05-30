@@ -114,7 +114,6 @@ public class WritingAgent extends ReActAgent {
     
     4.  **清晰的表达与可操作的建议：**
         *   你的思考过程和分析结果必须以清晰、简洁、有条理的方式呈现。
-        *   使用明确的标签（如 `Problem_Analysis:`, `Option_1:`, `Pros:`, `Cons:`, `Tool_Needed:`, `Recommendation:`, `Next_Step_Suggestion:` 等）来组织你的输出。
         *   最终的分析结论应导向具体、可操作的建议或下一步行动方案，方便其他智能体（如执行计划或内容创作智能体）直接采纳和执行。
     
     5.  **元认知与自我改进 (Self-Awareness & Improvement)：**
