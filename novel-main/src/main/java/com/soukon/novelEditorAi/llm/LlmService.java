@@ -53,7 +53,7 @@ public class LlmService {
                 *   **情节逻辑与节奏：** 故事情节发展需合乎逻辑，富有张力。注意叙事节奏的把控，根据场景需求进行铺垫、推进或引爆高潮。
                 *   **生动的语言与描写：** 运用丰富、精准且具有表现力的词汇。注重感官描写（视觉、听觉、嗅觉、味觉、触觉），营造身临其境的阅读体验。
                 *   **避免AI痕迹：** 努力使你的语言风格自然、独特，避免使用AI常见的刻板句式、陈词滥调或过度完美的表达。追求“人性化”的笔触，允许适度的、符合情境的“不完美”。
-                *   **原创性与创新性：** 在遵循用户设定的前提下，鼓励发挥创造力，提出新颖的观点、情节构思或表达方式。
+                *   **原创性与创新性：** 在遵循用户设定的前提下，充分尊重原创性，并适当鼓励发挥创造力。
                         
             4.  **工具的智能使用：**
                 *   在思考阶段，主动判断是否需要以及需要哪些外部工具来辅助完成任务（例如：获取角色详细信息、查询世界观设定、检查一致性、获取字数建议等）。
@@ -153,7 +153,9 @@ public class LlmService {
                     .defaultSystem(PLANNING_SYSTEM_PROMPT)
                     .defaultAdvisors(new SimpleLoggerAdvisor())
                     .defaultOptions(
-                            OpenAiChatOptions.builder().frequencyPenalty(1.0).temperature(0.6).build())
+                            OpenAiChatOptions.builder()
+//                                    .frequencyPenalty(1.0)
+                                    .temperature(0.2).build())
                     .build();
             return new AgentChatClientWrapper(agentChatClient, null);
         });
