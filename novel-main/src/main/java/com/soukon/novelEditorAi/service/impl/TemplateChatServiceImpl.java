@@ -21,6 +21,7 @@ import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -60,7 +61,7 @@ public class TemplateChatServiceImpl implements TemplateChatService {
     private final ConcurrentHashMap<String, String> conversationContexts = new ConcurrentHashMap<>();
 
     @Autowired
-    public TemplateChatServiceImpl(ChatModel chatModel) {
+    public TemplateChatServiceImpl(@Qualifier("openAiChatModel")ChatModel chatModel) {
         MessageWindowChatMemory memory = MessageWindowChatMemory.builder()
                 .maxMessages(10)
                 .build();

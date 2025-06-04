@@ -20,6 +20,7 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -39,7 +40,7 @@ public class CharacterServiceImpl extends ServiceImpl<CharacterMapper, Character
     private final ObjectMapper objectMapper;
 
     @Autowired
-    public CharacterServiceImpl(ChatModel openAiChatModel, ProjectService projectService) {
+    public CharacterServiceImpl(@Qualifier("openAiChatModel") ChatModel openAiChatModel, ProjectService projectService) {
         this.chatClient = ChatClient.builder(openAiChatModel)
                 .defaultAdvisors(
                         new SimpleLoggerAdvisor()

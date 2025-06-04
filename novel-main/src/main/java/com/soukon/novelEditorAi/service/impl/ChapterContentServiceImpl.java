@@ -27,6 +27,7 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
@@ -95,7 +96,7 @@ public class ChapterContentServiceImpl implements ChapterContentService {
     private Boolean ragEnabled;
 
     @Autowired
-    public ChapterContentServiceImpl(ChatModel openAiChatModel,
+    public ChapterContentServiceImpl(@Qualifier("openAiChatModel") ChatModel openAiChatModel,
                                      ProjectMapper projectMapper,
                                      ChapterMapper chapterMapper,
                                      WorldMapper worldMapper,

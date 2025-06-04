@@ -40,12 +40,17 @@
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-starter-vector-store-chroma</artifactId>
         </dependency>
-
-        <!-- Spring AI Vector Store -->
+        <!-- gemini api-->
 <!--        <dependency>-->
 <!--            <groupId>org.springframework.ai</groupId>-->
-<!--            <artifactId>spring-ai-vectorstore</artifactId>-->
+<!--            <artifactId>spring-ai-starter-model-vertex-ai-gemini</artifactId>-->
 <!--        </dependency>-->
+
+        <!-- Spring AI Vector Store -->
+        <!--        <dependency>-->
+        <!--            <groupId>org.springframework.ai</groupId>-->
+        <!--            <artifactId>spring-ai-vectorstore</artifactId>-->
+        <!--        </dependency>-->
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -58,11 +63,11 @@
             <artifactId>soukon_common_redis</artifactId>
             <version>1.0</version>
         </dependency>
-<!--        <dependency>-->
-<!--            <groupId>com.soukon</groupId>-->
-<!--            <artifactId>soukon_common_auth</artifactId>-->
-<!--            <version>1.0</version>-->
-<!--        </dependency>-->
+        <!--        <dependency>-->
+        <!--            <groupId>com.soukon</groupId>-->
+        <!--            <artifactId>soukon_common_auth</artifactId>-->
+        <!--            <version>1.0</version>-->
+        <!--        </dependency>-->
         <dependency>
             <groupId>com.soukon</groupId>
             <artifactId>soukon_common_database</artifactId>

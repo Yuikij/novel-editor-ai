@@ -26,6 +26,7 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -48,7 +49,7 @@ public class OutlinePlotPointServiceImpl extends ServiceImpl<OutlinePlotPointMap
     private final ChapterService chapterService;
     
     @Autowired
-    public OutlinePlotPointServiceImpl(ChatModel openAiChatModel, 
+    public OutlinePlotPointServiceImpl(@Qualifier("openAiChatModel") ChatModel openAiChatModel,
                                       ObjectMapper objectMapper,
                                       ProjectService projectService,
                                       WorldService worldService,

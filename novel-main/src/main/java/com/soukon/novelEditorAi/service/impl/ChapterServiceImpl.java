@@ -20,6 +20,7 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
@@ -43,7 +44,7 @@ public class ChapterServiceImpl extends ServiceImpl<ChapterMapper, Chapter> impl
     private final OutlinePlotPointService outlinePlotPointService;
 
     @Autowired
-    public ChapterServiceImpl(ChapterMapper chapterMapper, ProjectService projectService,ChatModel openAiChatModel,
+    public ChapterServiceImpl(ChapterMapper chapterMapper, ProjectService projectService,@Qualifier("openAiChatModel") ChatModel openAiChatModel,
                               CharacterService characterService,CharacterRelationshipService characterRelationshipService,
                               @Lazy OutlinePlotPointService outlinePlotPointService
     ) {

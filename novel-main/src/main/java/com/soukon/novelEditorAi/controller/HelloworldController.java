@@ -27,6 +27,7 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 
@@ -46,7 +47,7 @@ public class HelloworldController {
 	private final ChatClient openAiChatClient;
 
     // 也可以使用如下的方式注入 ChatClient
-	 public HelloworldController(ChatModel openAiChatModel) {
+	 public HelloworldController(@Qualifier("openAiChatModel") ChatModel openAiChatModel) {
 		 MessageWindowChatMemory memory = MessageWindowChatMemory.builder()
 				 .maxMessages(10)
 				 .build();

@@ -46,7 +46,6 @@ public class RagServiceImpl implements RagService {
     private final CharacterMapper characterMapper;
     private final WorldMapper worldMapper;
 
-    private final ChatClient chatClient;
     @Value("${novel.rag.chunk-size:500}")
     private int chunkSize;
 
@@ -68,27 +67,13 @@ public class RagServiceImpl implements RagService {
     public RagServiceImpl(ProjectMapper projectMapper,
                           ChapterMapper chapterMapper,
                           CharacterMapper characterMapper,
-                          WorldMapper worldMapper,
-                          ChatModel openAiChatModel) {
+                          WorldMapper worldMapper
+                          ) {
 
         this.projectMapper = projectMapper;
         this.chapterMapper = chapterMapper;
         this.characterMapper = characterMapper;
         this.worldMapper = worldMapper;
-        this.chatClient = ChatClient.builder(openAiChatModel)
-                // 实现 Chat Memory 的 Advisor
-                // 在使用 Chat Memory 时，需要指定对话 ID，以便 Spring AI 处理上下文。
-                // 实现 Logger 的 Advisor
-                .defaultAdvisors(
-                        new SimpleLoggerAdvisor()
-                )
-                // 设置 ChatClient 中 ChatModel 的 Options 参数
-                .defaultOptions(
-                        OpenAiChatOptions.builder()
-                                .topP(0.7)
-                                .build()
-                )
-                .build();
     }
 
 

@@ -60,7 +60,7 @@ public class NamingServiceImpl implements NamingService {
     private final ObjectMapper objectMapper;
 
 
-    public NamingServiceImpl( ObjectMapper objectMapper, ChatModel openAiChatModel) {
+    public NamingServiceImpl( ObjectMapper objectMapper, @Qualifier("openAiChatModel")ChatModel openAiChatModel) {
         this.chatClient = ChatClient.builder(openAiChatModel)
                 // 实现 Chat Memory 的 Advisor
 //                // 在使用 Chat Memory 时，需要指定对话 ID，以便 Spring AI 处理上下文。
@@ -77,7 +77,7 @@ public class NamingServiceImpl implements NamingService {
                                 .topP(0.7)
                                 .build()
                 )
-                .build();;
+                .build();
         this.objectMapper = objectMapper;
     }
     

@@ -25,6 +25,7 @@ import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.MessageAggregator;
 import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 import java.util.concurrent.ConcurrentHashMap;
@@ -111,7 +112,7 @@ public class LlmService {
 
     private final ChatModel chatModel;
 
-    public LlmService(ChatModel chatModel) {
+    public LlmService(@Qualifier("openAiChatModel") ChatModel chatModel) {
         this.chatModel = chatModel;
         // 执行和总结规划，用相同的memory
         this.planningChatClient = ChatClient.builder(chatModel)
