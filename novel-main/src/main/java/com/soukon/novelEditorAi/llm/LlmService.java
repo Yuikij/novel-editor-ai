@@ -15,6 +15,7 @@
  */
 package com.soukon.novelEditorAi.llm;
 
+import com.soukon.novelEditorAi.agent.tool.ToolService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
@@ -25,6 +26,7 @@ import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.MessageAggregator;
 import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
@@ -112,6 +114,9 @@ public class LlmService {
 
     private final ChatModel chatModel;
 
+    @Autowired
+    private ToolService toolService;
+
     public LlmService(@Qualifier("openAiChatModel") ChatModel chatModel) {
         this.chatModel = chatModel;
         // 执行和总结规划，用相同的memory
@@ -153,10 +158,11 @@ public class LlmService {
             ChatClient agentChatClient = ChatClient.builder(chatModel)
                     .defaultSystem(PLANNING_SYSTEM_PROMPT)
                     .defaultAdvisors(new SimpleLoggerAdvisor())
+                    .defaultTools(toolService)
                     .defaultOptions(
                             OpenAiChatOptions.builder()
 //                                    .frequencyPenalty(1.0)
-                                    .temperature(0.2).build())
+                                    .temperature(0.8).build())
                     .build();
             return new AgentChatClientWrapper(agentChatClient, null);
         });

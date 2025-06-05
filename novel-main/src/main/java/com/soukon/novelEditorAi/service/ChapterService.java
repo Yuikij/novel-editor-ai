@@ -71,4 +71,32 @@ public interface ChapterService extends IService<Chapter> {
      * @return 章节列表
      */
     List<ChapterListDTO> getAllChapterList();
+
+    /**
+     * 获取章节最新内容，支持指定字数截取
+     * 如果当前章节没有内容，会向前查找上一章节的内容
+     *
+     * @param chapterId 章节ID
+     * @param wordCount 需要获取的字数（为null时返回全部内容）
+     * @return 章节内容字符串，如果没有找到任何内容则返回空字符串
+     */
+    String getLatestChapterContent(Long chapterId, Integer wordCount);
+
+    /**
+     * 验证并处理章节的sortOrder，确保在同一项目中不重复
+     * 如果发生重复，会自动调整后续章节的sortOrder
+     *
+     * @param chapter 要保存或更新的章节
+     * @param isUpdate 是否为更新操作（true为更新，false为新增）
+     * @throws IllegalArgumentException 如果参数无效
+     */
+    void validateAndHandleSortOrder(Chapter chapter, boolean isUpdate);
+
+    /**
+     * 重新整理项目中所有章节的sortOrder，确保连续且无重复
+     * 
+     * @param projectId 项目ID
+     * @return 重新整理的章节数量
+     */
+    int reorderChaptersByProject(Long projectId);
 }

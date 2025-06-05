@@ -430,4 +430,237 @@ public class ChapterServiceImpl extends ServiceImpl<ChapterMapper, Chapter> impl
         }
     }
 
+    /**
+     * 获取章节最新内容，支持指定字数截取
+     * 如果当前章节没有内容，会向前查找上一章节的内容
+     *
+     * @param chapterId 章节ID
+     * @param wordCount 需要获取的字数（为null时返回全部内容）
+     * @return 章节内容字符串，如果没有找到任何内容则返回空字符串
+     */
+    @Override
+    public String getLatestChapterContent(Long chapterId, Integer wordCount) {
+        if (chapterId == null) {
+            throw new IllegalArgumentException("章节ID不能为空");
+        }
+
+        try {
+            // 获取当前章节
+            Chapter currentChapter = getById(chapterId);
+            if (currentChapter == null) {
+                throw new IllegalArgumentException("找不到指定的章节: " + chapterId);
+            }
+
+            Long projectId = currentChapter.getProjectId();
+            Integer currentSortOrder = currentChapter.getSortOrder();
+            
+            if (projectId == null || currentSortOrder == null) {
+                log.warn("章节缺少项目ID或排序信息: chapterId={}", chapterId);
+                return "";
+            }
+
+            // 从当前章节开始向前查找有内容的章节
+            for (int sortOrder = currentSortOrder; sortOrder >= 1; sortOrder--) {
+                Chapter chapter = chapterMapper.selectByProjectIdAndOrder(projectId, sortOrder);
+                if (chapter != null && chapter.getContent() != null && !chapter.getContent().trim().isEmpty()) {
+                    String content = chapter.getContent();
+                    
+                    // 如果指定了字数限制，截取相应长度的内容
+                    if (wordCount != null && wordCount > 0 && content.length() > wordCount) {
+                        content = content.substring(Math.max(0, content.length() - wordCount));
+                    }
+                    
+                    log.info("找到章节内容: 项目ID={}, 章节排序={}, 内容长度={}", 
+                             projectId, sortOrder, content.length());
+                    return content;
+                }
+            }
+
+            // 如果没有找到任何有内容的章节
+            log.info("项目ID={}中从第{}章开始向前都没有找到有效内容", projectId, currentSortOrder);
+            return "";
+            
+        } catch (Exception e) {
+            log.error("获取章节最新内容失败: chapterId={}, wordCount={}, error={}", 
+                     chapterId, wordCount, e.getMessage(), e);
+            throw new RuntimeException("获取章节内容失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 验证并处理章节的sortOrder，确保在同一项目中不重复
+     * 如果发生重复，会自动调整后续章节的sortOrder
+     *
+     * @param chapter 要保存或更新的章节
+     * @param isUpdate 是否为更新操作（true为更新，false为新增）
+     * @throws IllegalArgumentException 如果参数无效
+     */
+    @Override
+    public void validateAndHandleSortOrder(Chapter chapter, boolean isUpdate) {
+        if (chapter == null) {
+            throw new IllegalArgumentException("章节信息不能为空");
+        }
+
+        Long projectId = chapter.getProjectId();
+        Integer sortOrder = chapter.getSortOrder();
+
+        if (projectId == null) {
+            throw new IllegalArgumentException("项目ID不能为空");
+        }
+
+        // 如果sortOrder为空，自动设置为最后一章的下一个序号
+        if (sortOrder == null) {
+            sortOrder = getNextAvailableSortOrder(projectId);
+            chapter.setSortOrder(sortOrder);
+            log.info("自动设置章节排序: 项目ID={}, 新排序={}", projectId, sortOrder);
+            return;
+        }
+
+        // 检查sortOrder是否合法（必须大于0）
+        if (sortOrder <= 0) {
+            throw new IllegalArgumentException("章节排序必须大于0");
+        }
+
+        // 查询是否存在相同sortOrder的章节
+        Chapter existingChapter = chapterMapper.selectByProjectIdAndOrder(projectId, sortOrder);
+        
+        if (existingChapter != null) {
+            // 如果是更新操作且是同一个章节，则允许
+            if (isUpdate && existingChapter.getId().equals(chapter.getId())) {
+                log.info("更新章节保持原有排序: 项目ID={}, 章节ID={}, 排序={}", 
+                         projectId, chapter.getId(), sortOrder);
+                return;
+            }
+
+            // 存在重复，需要调整后续章节的sortOrder
+            log.warn("检测到章节排序重复: 项目ID={}, 重复排序={}, 将调整后续章节排序", projectId, sortOrder);
+            adjustSubsequentChapterOrders(projectId, sortOrder, chapter.getId());
+        }
+
+        log.info("验证章节排序通过: 项目ID={}, 章节排序={}", projectId, sortOrder);
+    }
+
+    /**
+     * 获取项目中下一个可用的sortOrder
+     *
+     * @param projectId 项目ID
+     * @return 下一个可用的sortOrder
+     */
+    private Integer getNextAvailableSortOrder(Long projectId) {
+        LambdaQueryWrapper<Chapter> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(Chapter::getProjectId, projectId);
+        queryWrapper.orderByDesc(Chapter::getSortOrder);
+        queryWrapper.last("LIMIT 1");
+        
+        Chapter lastChapter = getOne(queryWrapper);
+        return lastChapter != null ? lastChapter.getSortOrder() + 1 : 1;
+    }
+
+    /**
+     * 调整指定sortOrder及其后续章节的排序，为新章节腾出位置
+     *
+     * @param projectId 项目ID
+     * @param startSortOrder 开始调整的sortOrder
+     * @param excludeChapterId 要排除的章节ID（新增章节时为null，更新时为当前章节ID）
+     */
+    private void adjustSubsequentChapterOrders(Long projectId, Integer startSortOrder, Long excludeChapterId) {
+        try {
+            // 查询需要调整的章节（从指定sortOrder开始的所有章节，按sortOrder升序）
+            LambdaQueryWrapper<Chapter> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(Chapter::getProjectId, projectId);
+            queryWrapper.ge(Chapter::getSortOrder, startSortOrder);
+            if (excludeChapterId != null) {
+                queryWrapper.ne(Chapter::getId, excludeChapterId);
+            }
+            queryWrapper.orderByAsc(Chapter::getSortOrder);
+            
+            List<Chapter> chaptersToAdjust = list(queryWrapper);
+            
+            if (chaptersToAdjust.isEmpty()) {
+                log.info("没有需要调整排序的章节: 项目ID={}, 起始排序={}", projectId, startSortOrder);
+                return;
+            }
+
+            log.info("开始调整章节排序: 项目ID={}, 影响章节数量={}, 起始排序={}", 
+                     projectId, chaptersToAdjust.size(), startSortOrder);
+
+            // 从后往前调整，避免排序冲突
+            // 给每个章节的sortOrder加1，为新章节腾出位置
+            for (int i = chaptersToAdjust.size() - 1; i >= 0; i--) {
+                Chapter chapterToAdjust = chaptersToAdjust.get(i);
+                Integer newSortOrder = chapterToAdjust.getSortOrder() + 1;
+                
+                log.debug("调整章节排序: ID={}, 原排序={}, 新排序={}", 
+                         chapterToAdjust.getId(), chapterToAdjust.getSortOrder(), newSortOrder);
+                
+                chapterToAdjust.setSortOrder(newSortOrder);
+                chapterToAdjust.setUpdatedAt(LocalDateTime.now());
+                updateById(chapterToAdjust);
+            }
+
+            log.info("章节排序调整完成: 项目ID={}, 调整了{}个章节", projectId, chaptersToAdjust.size());
+            
+        } catch (Exception e) {
+            log.error("调整章节排序失败: 项目ID={}, 起始排序={}, 错误={}", 
+                     projectId, startSortOrder, e.getMessage(), e);
+            throw new RuntimeException("调整章节排序失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 重新整理项目中所有章节的sortOrder，确保连续且无重复
+     * 
+     * @param projectId 项目ID
+     * @return 重新整理的章节数量
+     */
+    @Override
+    public int reorderChaptersByProject(Long projectId) {
+        if (projectId == null) {
+            throw new IllegalArgumentException("项目ID不能为空");
+        }
+
+        try {
+            // 查询项目所有章节，按当前sortOrder排序
+            LambdaQueryWrapper<Chapter> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(Chapter::getProjectId, projectId);
+            queryWrapper.orderByAsc(Chapter::getSortOrder);
+            
+            List<Chapter> chapters = list(queryWrapper);
+            
+            if (chapters.isEmpty()) {
+                log.info("项目没有章节需要重新排序: 项目ID={}", projectId);
+                return 0;
+            }
+
+            log.info("开始重新整理项目章节排序: 项目ID={}, 章节总数={}", projectId, chapters.size());
+
+            // 重新分配sortOrder，从1开始连续递增
+            LocalDateTime now = LocalDateTime.now();
+            int reorderedCount = 0;
+            
+            for (int i = 0; i < chapters.size(); i++) {
+                Chapter chapter = chapters.get(i);
+                Integer newSortOrder = i + 1;
+                
+                // 只有当sortOrder发生变化时才更新
+                if (!newSortOrder.equals(chapter.getSortOrder())) {
+                    log.debug("重新排序章节: ID={}, 标题={}, 原排序={}, 新排序={}", 
+                             chapter.getId(), chapter.getTitle(), chapter.getSortOrder(), newSortOrder);
+                    
+                    chapter.setSortOrder(newSortOrder);
+                    chapter.setUpdatedAt(now);
+                    updateById(chapter);
+                    reorderedCount++;
+                }
+            }
+
+            log.info("项目章节排序整理完成: 项目ID={}, 更新了{}个章节", projectId, reorderedCount);
+            return reorderedCount;
+            
+        } catch (Exception e) {
+            log.error("重新整理项目章节排序失败: 项目ID={}, 错误={}", projectId, e.getMessage(), e);
+            throw new RuntimeException("重新整理章节排序失败: " + e.getMessage());
+        }
+    }
+
 } 

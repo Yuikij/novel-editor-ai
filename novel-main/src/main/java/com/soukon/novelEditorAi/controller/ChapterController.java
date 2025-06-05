@@ -184,64 +184,76 @@ public class ChapterController {
 
     @PostMapping
     public Result<Chapter> save(@RequestBody Chapter chapter) {
-        LocalDateTime now = LocalDateTime.now();
-        chapter.setCreatedAt(now);
-        chapter.setUpdatedAt(now);
+        try {
+            LocalDateTime now = LocalDateTime.now();
+            chapter.setCreatedAt(now);
+            chapter.setUpdatedAt(now);
 
-        // If order is not set, find the max order in the project and set to order+1
-        if (chapter.getSortOrder() == null) {
-            LambdaQueryWrapper<Chapter> queryWrapper = new LambdaQueryWrapper<>();
-            queryWrapper.eq(Chapter::getProjectId, chapter.getProjectId());
-            queryWrapper.orderByDesc(Chapter::getSortOrder);
-            queryWrapper.last("LIMIT 1");
-            Chapter lastChapter = chapterService.getOne(queryWrapper);
+            // 验证并处理sortOrder重复问题
+            chapterService.validateAndHandleSortOrder(chapter, false);
 
-            if (lastChapter != null) {
-                chapter.setSortOrder(lastChapter.getSortOrder() + 1);
-            } else {
-                chapter.setSortOrder(1);
-            }
+            chapterService.save(chapter);
+            return Result.success("Chapter created successfully", chapter);
+        } catch (IllegalArgumentException e) {
+            log.error("章节创建参数错误: {}", e.getMessage());
+            return Result.error("参数错误: " + e.getMessage());
+        } catch (Exception e) {
+            log.error("章节创建失败: {}", e.getMessage(), e);
+            return Result.error("章节创建失败: " + e.getMessage());
         }
-
-        chapterService.save(chapter);
-        return Result.success("Chapter created successfully", chapter);
     }
 
     @PutMapping("/{id}")
     public Result<Chapter> update(@PathVariable("id") Long id, @RequestBody Chapter chapter) {
-        Chapter existingChapter = chapterService.getById(id);
-        if (existingChapter == null) {
-            return Result.error("Chapter not found with id: " + id);
+        try {
+            Chapter existingChapter = chapterService.getById(id);
+            if (existingChapter == null) {
+                return Result.error("Chapter not found with id: " + id);
+            }
+
+            // 设置章节ID和项目ID（确保验证时有完整信息）
+            chapter.setId(id);
+            if (chapter.getProjectId() == null) {
+                chapter.setProjectId(existingChapter.getProjectId());
+            }
+
+            // 验证并处理sortOrder重复问题
+            chapterService.validateAndHandleSortOrder(chapter, true);
+
+            // Save chapter history before updating
+
+            // Initialize historyContent if it's null
+            if (existingChapter.getHistoryContent() == null) {
+                existingChapter.setHistoryContent(new JSONObject());
+            }
+            JSONObject historyContent = existingChapter.getHistoryContent();
+            // Create a new history entry with timestamp as key
+            String timestamp = String.valueOf(System.currentTimeMillis());
+            historyContent.put(timestamp, chapter.getContent());
+            // Keep only the most recent 10 entries
+            if (historyContent.size() > 6) {
+                // Find the oldest timestamp key
+                String oldestKey = historyContent.keySet().stream()
+                        .sorted()
+                        .findFirst()
+                        .orElse(null);
+
+                // Remove the oldest entry
+                historyContent.remove(oldestKey);
+            }
+            chapter.setHistoryContent(historyContent);
+            chapter.setCreatedAt(existingChapter.getCreatedAt());
+            chapter.setUpdatedAt(LocalDateTime.now());
+            chapterService.updateById(chapter);
+
+            return Result.success("Chapter updated successfully", chapter);
+        } catch (IllegalArgumentException e) {
+            log.error("章节更新参数错误: {}", e.getMessage());
+            return Result.error("参数错误: " + e.getMessage());
+        } catch (Exception e) {
+            log.error("章节更新失败: {}", e.getMessage(), e);
+            return Result.error("章节更新失败: " + e.getMessage());
         }
-
-        // Save chapter history before updating
-
-        // Initialize historyContent if it's null
-        if (existingChapter.getHistoryContent() == null) {
-            existingChapter.setHistoryContent(new JSONObject());
-        }
-        JSONObject historyContent = existingChapter.getHistoryContent();
-        // Create a new history entry with timestamp as key
-        String timestamp = String.valueOf(System.currentTimeMillis());
-        historyContent.put(timestamp, chapter.getContent());
-        // Keep only the most recent 10 entries
-        if (historyContent.size() > 6) {
-            // Find the oldest timestamp key
-            String oldestKey = historyContent.keySet().stream()
-                    .sorted()
-                    .findFirst()
-                    .orElse(null);
-
-            // Remove the oldest entry
-            historyContent.remove(oldestKey);
-        }
-        chapter.setHistoryContent(historyContent);
-        chapter.setId(id);
-        chapter.setCreatedAt(existingChapter.getCreatedAt());
-        chapter.setUpdatedAt(LocalDateTime.now());
-        chapterService.updateById(chapter);
-
-        return Result.success("Chapter updated successfully", chapter);
     }
 
     @DeleteMapping("/{id}")
@@ -269,6 +281,26 @@ public class ChapterController {
 
         chapterService.removeByIds(ids);
         return Result.success("批量删除成功", null);
+    }
+
+    /**
+     * 重新整理项目中所有章节的排序，确保连续且无重复
+     *
+     * @param projectId 项目ID
+     * @return 重新整理的结果
+     */
+    @PostMapping("/reorder/{projectId}")
+    public Result<Integer> reorderChaptersByProject(@PathVariable("projectId") Long projectId) {
+        try {
+            int reorderedCount = chapterService.reorderChaptersByProject(projectId);
+            return Result.success("章节排序整理成功，更新了" + reorderedCount + "个章节", reorderedCount);
+        } catch (IllegalArgumentException e) {
+            log.error("重新整理章节排序参数错误: {}", e.getMessage());
+            return Result.error("参数错误: " + e.getMessage());
+        } catch (Exception e) {
+            log.error("重新整理章节排序失败: {}", e.getMessage(), e);
+            return Result.error("重新整理失败: " + e.getMessage());
+        }
     }
 
     /**

@@ -405,6 +405,10 @@ public class ChapterContentServiceImpl implements ChapterContentService {
         if (itemIds != null && !itemIds.isEmpty()) {
             itemsPrompt = itemService.getItemsPrompt(itemIds);
         }
+
+        PlanInfo planInfo = new PlanInfo();
+        planInfo.setChapterId(request.getChapterId());
+        planInfo.setPlanId(planContext.getPlanId());
         // 使用Flux合并所有步骤的内容
         int index = 1;
         for (PlanDetailRes planStep : planList) {
@@ -420,6 +424,7 @@ public class ChapterContentServiceImpl implements ChapterContentService {
             executorParams.put("character", plotService.toCharacter(plot));
             executorParams.put("plot", plot.getDescription());
             executorParams.put("promptSuggestion", request.getPromptSuggestion());
+            executorParams.put("planInfo", planInfo.toString());
             if (itemsPrompt != null) {
                 executorParams.put("itemsPrompt", itemsPrompt);
             }
