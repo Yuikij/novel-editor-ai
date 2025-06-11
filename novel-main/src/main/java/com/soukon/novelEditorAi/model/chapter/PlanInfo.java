@@ -11,6 +11,6 @@ public class PlanInfo {
     @Override
     public String toString() {
         return "计划id为：'" + planId + '\'' +
-               ", 章节id为：" + chapterId;
+               ", 章节id为：\"" + chapterId + '\"';
     }
 }

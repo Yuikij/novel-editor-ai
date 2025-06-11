@@ -22,9 +22,9 @@ spring:
   cloud:
     nacos:
       discovery:
-        server-addr: 100.81.212.120
+        server-addr: 172.23.104.184
       config:
-        server-addr: 100.81.212.120
+        server-addr: 172.23.104.184
         file-extension: yml
         username: nacos
         password: nacos

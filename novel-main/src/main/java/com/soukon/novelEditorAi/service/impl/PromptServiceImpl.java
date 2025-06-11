@@ -93,6 +93,9 @@ public class PromptServiceImpl implements PromptService {
             4. **细节丰富**：通过具体的细节来营造氛围和推进情节
             5. **语言美感**：追求语言的优美和表达的精准
             
+            ## 优先使用工具调用获取更多信息
+            - latest_content_get：获取目前小说的最新内容，如果该章节有内容，则返回最新的内容，如果该章节没有内容，则返回上一章节内容。
+            
             ## 计划要求
             - 将写作任务分解为3-6个逻辑清晰的步骤
             - 每个步骤都有明确的文学目标（不仅仅是情节目标）
@@ -106,7 +109,7 @@ public class PromptServiceImpl implements PromptService {
             - 避免忽视人物的内心活动
             - 避免缺乏环境和氛围的营造
             - 避免语言平淡无味
-         
+
             直接输出结构化json格式，不需要额外的任何解释说明！
             
             输出的json格式为：{%s}
@@ -114,6 +117,10 @@ public class PromptServiceImpl implements PromptService {
 
         // 用户提示词 - 包含章节上下文信息
         StringBuilder userPromptBuilder = new StringBuilder();
+        userPromptBuilder.append("""
+                先使用工具获得更多信息\
+                - latest_content_get：获取目前小说的最新内容，如果该章节有内容，则返回最新的内容，如果该章节没有内容，则返回上一章节内容。\
+                """);
         userPromptBuilder.append("请根据以下上下文信息，分析并创作符合要求的写作计划：\n\n");
 
         String context = extracted(request, chapterContext);
@@ -137,7 +144,6 @@ public class PromptServiceImpl implements PromptService {
             plot.setDescription("根据上文和目标字数创作,相关建议为" + request.getPromptSuggestion());
         }
 
-
         // 提示
 
         userPromptBuilder.append("\n## 直接输出结构化json格式，不需要额外的任何解释说明！\n");
@@ -151,31 +157,6 @@ public class PromptServiceImpl implements PromptService {
         log.info("[Reasoning] 最终推理提示词(System):\n{}", systemPrompt);
         log.info("[Reasoning] 最终推理提示词(User):\n{}", userPromptBuilder.toString());
         return messages;
-    }
-
-    @Override
-    public List<Message> buildTemplatesPrompt(Long templateId) {
-        Template template = templateMapper.selectById(templateId);
-        String templateString = template.toString();
-        String systemPrompt = """
-                你是一位精通文学分析和创作的AI助手。请执行以下步骤:
-
-                1. 分析提供的文本样本，识别以下特征:
-                   - 句子长度和复杂度模式
-                   - 段落结构和转换方式
-                   - 词汇选择和修辞特色
-                   - 叙事视角和语气
-                   - 标点和语法习惯
-                   - 独特的写作习惯或风格特征
-
-                2. 创作新内容，严格遵循以下要求:
-                   - 保持相同的句子节奏和长度分布
-                   - 使用相似的词汇层次和修辞手法
-                   - 复制相同的段落结构和转换方式
-                   - 维持一致的叙事视角和语气
-                   - 模仿原作者的独特习惯和风格特征""";
-
-        return List.of();
     }
 
     private String extracted(ChapterContentRequest request, ChapterContext context) {

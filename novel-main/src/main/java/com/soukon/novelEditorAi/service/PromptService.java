@@ -18,7 +18,7 @@ public interface PromptService {
     List<Message> buildReasoningPrompt(ChapterContentRequest request);
 
 
-    List<Message> buildTemplatesPrompt(Long templateId);
+
     /**
      * 构建执行阶段的提示词（用于实际创作）
      * @param request 章节内容请求
