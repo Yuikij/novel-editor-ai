@@ -69,4 +69,37 @@ public class ToolTest {
             llmService.removeAgentChatClient(testPlanId);
         }
     }
+
+    @Test
+    void testPlanningPhaseToolCall() {
+        // 测试计划生成阶段的工具调用
+        String testPlanId = "planning-test-" + System.currentTimeMillis();
+        
+        try {
+            // 使用LlmService的AgentChatClient（模拟计划生成的使用方式）
+            ChatClient agentChatClient = llmService.getAgentChatClient(testPlanId).getChatClient();
+            
+            String testPrompt = """
+                ## 第一步：必须使用工具获取信息
+                在制定计划前，请立即执行以下步骤：
+                1. 调用latest_content_get工具获取最新内容（章节ID: "1922923956958334978", 字数: 1000, 计划ID: "%s"）
+                2. 基于工具返回的真实内容进行后续分析
+                
+                ## 第二步：基于工具结果制定写作计划
+                获取工具信息后，请根据以下信息制定简单的写作计划。
+                
+                ## 第三步：输出格式
+                完成工具调用和分析后，输出一个简单的JSON：{"message": "工具调用成功", "plan": "基于工具结果的简单计划"}
+                """.formatted(testPlanId);
+                
+            String response = agentChatClient.prompt(testPrompt).call().content();
+            System.out.println("=== 计划生成测试响应 ===");
+            System.out.println(response);
+            System.out.println("=== 测试完成 ===");
+            
+        } finally {
+            // 清理测试数据
+            llmService.removeAgentChatClient(testPlanId);
+        }
+    }
 }
