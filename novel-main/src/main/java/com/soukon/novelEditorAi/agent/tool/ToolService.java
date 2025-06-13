@@ -44,7 +44,7 @@ public class ToolService {
         log.info("=== 工具调用开始 ===");
         log.info("工具名称: get_character_info");
         log.info("调用参数: 章节ID={}, 项目ID={}, 角色名称={}, 计划ID={}", chapterId, projectId, name, planId);
-        
+
         LambdaQueryWrapper<Character> queryWrapper = new LambdaQueryWrapper<>();
         if (name != null && !name.isEmpty()) {
             return "";
@@ -53,7 +53,7 @@ public class ToolService {
                 .eq(Character::getName, name);
         String prompt = "";
         List<Character> list = characterService.list(queryWrapper);
-        
+
         // 安全地获取PlanContext，避免测试环境中的null错误
         PlanContext planContext = chapterContentService.getPlanContextMap().get(planId);
         if (planContext != null) {
@@ -61,12 +61,12 @@ public class ToolService {
         } else {
             log.warn("测试环境：未找到planId={}对应的PlanContext", planId);
         }
-        
+
         log.info("工具调用：获取角色信息，章节ID: {}, 项目ID: {}, 角色名称: {}, 计划ID: {}", chapterId, projectId, name, planId);
         if (!list.isEmpty()) {
             prompt = characterService.toPrompt(list.get(0));
         }
-        
+
         log.info("工具调用结果: {}", prompt.length() > 100 ? prompt.substring(0, 100) + "..." : prompt);
         log.info("=== 工具调用结束 ===");
         return prompt;
@@ -82,7 +82,7 @@ public class ToolService {
         log.info("=== 工具调用开始 ===");
         log.info("工具名称: latest_content_get");
         log.info("调用参数: 章节ID={}, 字数={}, 计划ID={}", chapterId, wordCount, planId);
-        
+
         // 安全地获取PlanContext，避免测试环境中的null错误
         PlanContext planContext = chapterContentService.getPlanContextMap().get(planId);
         if (planContext != null) {
@@ -90,13 +90,24 @@ public class ToolService {
         } else {
             log.warn("测试环境：未找到planId={}对应的PlanContext", planId);
         }
-        
+
         log.info("工具调用：获取最新内容，章节ID: {}, 字数: {}, 计划ID: {}", chapterId, wordCount, planId);
         String result = chapterService.getLatestChapterContent(Long.parseLong(chapterId), wordCount);
-        
+
         log.info("工具调用结果: {}", result.length() > 100 ? result.substring(0, 100) + "..." : result);
         log.info("=== 工具调用结束 ===");
         return result;
+    }
+
+
+    @Tool(name = "rag_query", description = """
+            检索相关信息
+            """)
+    public String ragQuery(@ToolParam(description = "章节id") String chapterId,
+                           @ToolParam(description = "想要查询的内容") Integer wordCount,
+                           @ToolParam(description = "计划id") String planId) {
+//     todo 待实现
+        return "";
     }
 
 //    @Tool(name = "weather_get", description = """

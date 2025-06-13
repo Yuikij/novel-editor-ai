@@ -4,9 +4,16 @@ import com.soukon.novelEditorAi.agent.tool.ToolService;
 import com.soukon.novelEditorAi.llm.LlmService;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.prompt.ChatOptions;
+import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+
+import java.util.List;
 
 @SpringBootTest
 public class ToolTest {
@@ -77,8 +84,9 @@ public class ToolTest {
         
         try {
             // 使用LlmService的AgentChatClient（模拟计划生成的使用方式）
-            ChatClient agentChatClient = llmService.getAgentChatClient(testPlanId).getChatClient();
-            
+
+            ChatOptions chatOptions = ToolCallingChatOptions.builder().internalToolExecutionEnabled(false).build();
+
             String testPrompt = """
                 ## 第一步：必须使用工具获取信息
                 在制定计划前，请立即执行以下步骤：
@@ -89,12 +97,15 @@ public class ToolTest {
                 获取工具信息后，请根据以下信息制定简单的写作计划。
                 
                 ## 第三步：输出格式
-                完成工具调用和分析后，输出一个简单的JSON：{"message": "工具调用成功", "plan": "基于工具结果的简单计划"}
+                完成工具调用和分析后，直接输出一个简单的JSON，不需要给出思考结果：{"message": "工具调用成功", "plan": "基于工具结果的简单计划"}
                 """.formatted(testPlanId);
-                
-            String response = agentChatClient.prompt(testPrompt).call().content();
+//            Prompt prompt = new Prompt(testPrompt, chatOptions);
+            Prompt prompt = new Prompt(testPrompt);
+            ChatClient agentChatClient = llmService.getAgentChatClient(testPlanId).getChatClient();
+            ChatResponse response = agentChatClient.prompt(prompt).call().chatResponse();
+            List<AssistantMessage.ToolCall> toolCalls = response.getResult().getOutput().getToolCalls();
             System.out.println("=== 计划生成测试响应 ===");
-            System.out.println(response);
+            System.out.println(toolCalls);
             System.out.println("=== 测试完成 ===");
             
         } finally {
