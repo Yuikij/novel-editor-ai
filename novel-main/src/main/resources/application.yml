@@ -31,6 +31,36 @@ spring:
         namespace: 12705118-223c-456b-817f-3838f5735680
   main:
     allow-circular-references: true
+
+
+#            # 备用测试服务器（可能不可用，用于测试容错）
+#            test-server-1:
+#              url: "http://localhost:8080/mcp"
+#              description: "本地测试MCP服务器"
+#
+#            test-server-2:
+#              url: "http://localhost:8081/mcp"
+#              description: "备用本地测试MCP服务器"
+#
+#        # STDIO本地连接配置（用于本地开发测试）
+#        stdio:
+#          connections:
+#            # 文件系统服务器
+#            filesystem-server:
+#              command: npx
+#              args:
+#                - "-y"
+#                - "@modelcontextprotocol/server-filesystem"
+#                - "/tmp"
+#              description: "文件系统操作MCP服务器"
+#
+#            # 计算器服务器
+#            calculator-server:
+#              command: npx
+#              args:
+#                - "-y"
+#                - "@modelcontextprotocol/server-everything"
+#              description: "通用计算和工具MCP服务器"
 #  ai:
 #    vectorstore:
 #      chroma:
