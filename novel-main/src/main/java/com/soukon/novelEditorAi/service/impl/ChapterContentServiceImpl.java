@@ -2,6 +2,7 @@ package com.soukon.novelEditorAi.service.impl;
 
 import com.alibaba.nacos.common.utils.UuidUtils;
 import com.soukon.novelEditorAi.agent.AgentState;
+import com.soukon.novelEditorAi.agent.PlanningAgent;
 import com.soukon.novelEditorAi.agent.WritingAgent;
 import com.soukon.novelEditorAi.common.Result;
 import com.soukon.novelEditorAi.entities.Chapter;
@@ -327,8 +328,8 @@ public class ChapterContentServiceImpl implements ChapterContentService {
     @Override
     public void generateChapterContentStreamFlux(ChapterContentRequest request) {
 
-        // 第一阶段：Reasoning - 理解和分析需求
-        log.info("[Reasoning] 开始分析章节内容生成需求");
+        // 第一阶段：Planning - 使用PlanningAgent制定写作计划
+        log.info("[Planning] 开始使用PlanningAgent制定章节写作计划");
 
         // 验证请求参数
         validateRequest(request);
@@ -343,36 +344,45 @@ public class ChapterContentServiceImpl implements ChapterContentService {
             request.setMaxTokens(defaultMaxTokens);
         } else if (request.getMaxTokens() > 4000) {
             // 限制最大 token 数，即使用户请求更多也进行控制
-            log.warn("[Reasoning] 请求的 token 数过大，已限制为 4000");
+            log.warn("[Planning] 请求的 token 数过大，已限制为 4000");
             request.setMaxTokens(4000);
         }
         if (request.getTemperature() == null) {
             request.setTemperature(defaultTemperature);
         }
 
-        // 构建推理指导提示词 - 使用PromptService
-        List<Message> reasoningMessages = promptService.buildReasoningPrompt(request);
-
-        // 执行推理过程，分析章节要求并制定写作计划
-        String reasoningResult;
+        // 使用PlanningAgent制定写作计划
         PlanRes planRes;
         PlanContext planContext = request.getPlanContext();
         try {
-            BeanOutputConverter<PlanRes> converter = new BeanOutputConverter<>(PlanRes.class);
-            log.info("[Reasoning] 正在分析章节要求并制定写作计划");
-
-            reasoningResult = llmService.getAgentChatClient(planContext.getPlanId()).getChatClient()
-                    .prompt(new Prompt(reasoningMessages)).call().content();
-            log.info("[Reasoning] 完成章节分析和写作计划原数据: {}", reasoningResult);
-            planRes = reasoningResult == null ? null : converter.convert(reasoningResult);
-            log.info("[Reasoning] 完成章节分析和写作计划: {}", planRes);
+            log.info("[Planning] 创建PlanningAgent并开始制定计划");
+            
+            // 创建PlanningAgent实例
+            PlanningAgent planningAgent = new PlanningAgent(llmService, request);
+            planningAgent.setPlanId(planContext.getPlanId());
+            
+            // 准备执行参数
+            Map<String, Object> planningParams = new HashMap<>();
+            planningParams.put("chapterId", request.getChapterId());
+            planningParams.put("projectId", context.getProjectId());
+            planningParams.put("targetWordCount", request.getMaxTokens());
+            planningParams.put("promptSuggestion", request.getPromptSuggestion());
+            
+            // 执行计划制定
+            planningAgent.run(planningParams);
+            
+            // 获取制定的计划
+            planRes = planningAgent.getFinalPlan();
+            
+            log.info("[Planning] PlanningAgent完成计划制定: {}", planRes);
         } catch (Exception e) {
-            log.error("[Reasoning] 章节分析失败: {}", e.getMessage(), e);
-            throw new RuntimeException("分析章节要求失败：" + e.getMessage(), e);
+            log.error("[Planning] PlanningAgent计划制定失败: {}", e.getMessage(), e);
+            throw new RuntimeException("制定写作计划失败：" + e.getMessage(), e);
         }
+        
         if (planRes == null) {
-            log.error("[Reasoning] 章节分析结果为空");
-            throw new RuntimeException("分析章节要求失败：结果为空");
+            log.error("[Planning] PlanningAgent计划制定结果为空");
+            throw new RuntimeException("制定写作计划失败：结果为空");
         }
 
         // 将planRes的completePercent保存到数据库

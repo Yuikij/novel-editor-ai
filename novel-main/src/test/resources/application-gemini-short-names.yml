@@ -1,0 +1,26 @@
+spring:
+  ai:
+    openai:
+      chat:
+        options:
+          model: gemini-2.0-flash
+          temperature: 0.7
+    mcp:
+      client:
+        enabled: true
+        name: ne-mcp  # 缩短客户端名称
+        version: 1.0.0
+        request-timeout: 30s
+        type: SYNC
+        
+        sse:
+          connections:
+            amap:  # 缩短连接名称
+              url: "https://mcp.amap.com/sse?key=22f29e896498f61b3f96ac3a5a0b6dad"
+              description: "高德地图MCP服务器"
+
+logging:
+  level:
+    org.springframework.ai.mcp: DEBUG
+    org.springframework.ai.mcp.client: DEBUG
+    org.springframework.ai.tool: DEBUG 
