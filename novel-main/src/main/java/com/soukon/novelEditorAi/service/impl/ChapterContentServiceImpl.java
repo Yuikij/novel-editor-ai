@@ -356,11 +356,11 @@ public class ChapterContentServiceImpl implements ChapterContentService {
         PlanContext planContext = request.getPlanContext();
         try {
             log.info("[Planning] 创建PlanningAgent并开始制定计划");
-            
+            planContext.setPlanState(PlanState.PLANNING);
             // 创建PlanningAgent实例
             PlanningAgent planningAgent = new PlanningAgent(llmService, request);
             planningAgent.setPlanId(planContext.getPlanId());
-            
+            planningAgent.setState(AgentState.IN_PROGRESS);
             // 准备执行参数
             Map<String, Object> planningParams = new HashMap<>();
             planningParams.put("chapterId", request.getChapterId());

@@ -180,81 +180,81 @@ public class PromptServiceImpl implements PromptService {
         userPromptBuilder.append("- 请先使用工具获取真实内容\n");
         userPromptBuilder.append("- 然后基于工具结果制定计划\n\n");
         
-        // 第一部分：小说元数据
-//        userPromptBuilder.append("## 1. 小说元数据\n");
-//
-//        // 项目信息
-//        if (context.getProject() != null) {
-//            userPromptBuilder.append(projectService.toPrompt(context.getProject())).append("\n");
-//        }
-//
-//        // 角色信息
-//        if (context.getCharacters() != null && !context.getCharacters().isEmpty()) {
-//            userPromptBuilder.append("### 主要角色\n");
-//            context.getCharacters().forEach(character -> userPromptBuilder.append(characterService.toPrompt(character)));
-//            userPromptBuilder.append("\n");
-//        }
-//
-//        // 角色关系信息
-//        if (context.getCharacterRelationships() != null && !context.getCharacterRelationships().isEmpty()) {
-//            userPromptBuilder.append("### 角色关系\n");
-//            context.getCharacterRelationships().forEach(rel -> userPromptBuilder.append(characterRelationshipService.toPrompt(rel)));
-//            userPromptBuilder.append("\n");
-//        }
-//
-//        // 大纲情节点信息
-//        if (context.getPlotPoints() != null && !context.getPlotPoints().isEmpty()) {
-//            userPromptBuilder.append("### 小说整体大纲\n");
-//            context.getPlotPoints().forEach(point -> userPromptBuilder.append(outlinePlotPointService.toPrompt(point)));
-//            userPromptBuilder.append("\n");
-//        }
-//
-//        // 第二部分：写作目标
-//        userPromptBuilder.append("## 2. 写作目标\n");
-//
-//        // 添加写作目标的具体要求
-//        Chapter currentChapter = context.getCurrentChapter();
-//        if (currentChapter != null) {
-//            userPromptBuilder.append("### 写作要求\n");
-//            if (currentChapter.getWordCountGoal() != null) {
-//                userPromptBuilder.append("- 本章节的目标字数：").append(currentChapter.getWordCountGoal()).append("字\n");
-//            }
-//            if (request.getWordCountSuggestion() != null) {
-//                userPromptBuilder.append("- 当前目标字数：").append(request.getWordCountSuggestion()).append("字（必须严格遵守，优先级高于章节目标字数或其他字数要求）\n");
-//            }
-//            if (currentChapter.getContent() != null && !currentChapter.getContent().isEmpty()) {
-//                userPromptBuilder.append("- 类型：续写\n");
-//            } else {
-//                userPromptBuilder.append("- 类型：创作\n");
-//            }
-//            userPromptBuilder.append("- 写作建议：").append(request.getPromptSuggestion()).append("\n");
-//
-//            userPromptBuilder.append("\n");
-//        }
-//
-//        // 第三部分：当前写作进度和章节信息
-//        userPromptBuilder.append("## 3. 当前写作进度和章节信息\n");
-//
-//        // 章节信息
-//        String previousChapterSummary = context.getPreviousChapter() != null ? context.getPreviousChapter().getSummary() : null;
-//        if (currentChapter != null) {
-//            userPromptBuilder.append(chapterService.toPrompt(currentChapter, previousChapterSummary));
-//            userPromptBuilder.append("\n");
-//        }
-//
-//        // 已有内容
-//        if (currentChapter != null && currentChapter.getContent() != null && !currentChapter.getContent().isEmpty()) {
-//            userPromptBuilder.append("### 已有内容\n");
-//            // 为避免提示词过长，可以考虑只截取现有内容的一部分
-//            String content = currentChapter.getContent();
-//            if (content.length() > 5000) {
-//                content = content.substring(Math.max(0, content.length() - 5000));
-//                userPromptBuilder.append("(已截取最后部分内容)\n");
-//            }
-//            userPromptBuilder.append(content).append("\n\n");
-//        } else {
-//            userPromptBuilder.append("已有内容为空\n");
-//        }
+//         第一部分：小说元数据
+        userPromptBuilder.append("## 1. 小说元数据\n");
+
+        // 项目信息
+        if (context.getProject() != null) {
+            userPromptBuilder.append(projectService.toPrompt(context.getProject())).append("\n");
+        }
+
+        // 角色信息
+        if (context.getCharacters() != null && !context.getCharacters().isEmpty()) {
+            userPromptBuilder.append("### 主要角色\n");
+            context.getCharacters().forEach(character -> userPromptBuilder.append(characterService.toPrompt(character)));
+            userPromptBuilder.append("\n");
+        }
+
+        // 角色关系信息
+        if (context.getCharacterRelationships() != null && !context.getCharacterRelationships().isEmpty()) {
+            userPromptBuilder.append("### 角色关系\n");
+            context.getCharacterRelationships().forEach(rel -> userPromptBuilder.append(characterRelationshipService.toPrompt(rel)));
+            userPromptBuilder.append("\n");
+        }
+
+        // 大纲情节点信息
+        if (context.getPlotPoints() != null && !context.getPlotPoints().isEmpty()) {
+            userPromptBuilder.append("### 小说整体大纲\n");
+            context.getPlotPoints().forEach(point -> userPromptBuilder.append(outlinePlotPointService.toPrompt(point)));
+            userPromptBuilder.append("\n");
+        }
+
+        // 第二部分：写作目标
+        userPromptBuilder.append("## 2. 写作目标\n");
+
+        // 添加写作目标的具体要求
+        Chapter currentChapter = context.getCurrentChapter();
+        if (currentChapter != null) {
+            userPromptBuilder.append("### 写作要求\n");
+            if (currentChapter.getWordCountGoal() != null) {
+                userPromptBuilder.append("- 本章节的目标字数：").append(currentChapter.getWordCountGoal()).append("字\n");
+            }
+            if (request.getWordCountSuggestion() != null) {
+                userPromptBuilder.append("- 当前目标字数：").append(request.getWordCountSuggestion()).append("字（必须严格遵守，优先级高于章节目标字数或其他字数要求）\n");
+            }
+            if (currentChapter.getContent() != null && !currentChapter.getContent().isEmpty()) {
+                userPromptBuilder.append("- 类型：续写\n");
+            } else {
+                userPromptBuilder.append("- 类型：创作\n");
+            }
+            userPromptBuilder.append("- 写作建议：").append(request.getPromptSuggestion()).append("\n");
+
+            userPromptBuilder.append("\n");
+        }
+
+        // 第三部分：当前写作进度和章节信息
+        userPromptBuilder.append("## 3. 当前写作进度和章节信息\n");
+
+        // 章节信息
+        String previousChapterSummary = context.getPreviousChapter() != null ? context.getPreviousChapter().getSummary() : null;
+        if (currentChapter != null) {
+            userPromptBuilder.append(chapterService.toPrompt(currentChapter, previousChapterSummary));
+            userPromptBuilder.append("\n");
+        }
+
+        // 已有内容
+        if (currentChapter != null && currentChapter.getContent() != null && !currentChapter.getContent().isEmpty()) {
+            userPromptBuilder.append("### 已有内容\n");
+            // 为避免提示词过长，可以考虑只截取现有内容的一部分
+            String content = currentChapter.getContent();
+            if (content.length() > 5000) {
+                content = content.substring(Math.max(0, content.length() - 5000));
+                userPromptBuilder.append("(已截取最后部分内容)\n");
+            }
+            userPromptBuilder.append(content).append("\n\n");
+        } else {
+            userPromptBuilder.append("已有内容为空\n");
+        }
 
         return userPromptBuilder.toString();
     }

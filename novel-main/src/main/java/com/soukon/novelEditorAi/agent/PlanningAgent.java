@@ -25,9 +25,11 @@
  import lombok.NoArgsConstructor;
  import org.slf4j.Logger;
  import org.slf4j.LoggerFactory;
+ import org.springframework.ai.chat.messages.AssistantMessage;
  import org.springframework.ai.chat.messages.Message;
  import org.springframework.ai.chat.messages.SystemMessage;
  import org.springframework.ai.chat.messages.UserMessage;
+ import org.springframework.ai.chat.model.ChatResponse;
  import org.springframework.ai.chat.prompt.Prompt;
  import org.springframework.ai.chat.prompt.PromptTemplate;
  import org.springframework.ai.converter.BeanOutputConverter;
@@ -49,6 +51,12 @@
 
      private static final Logger log = LoggerFactory.getLogger(PlanningAgent.class);
 
+     // 最大工具调用轮次，防止无限循环
+     private static final int MAX_TOOL_CALL_ROUNDS = 3;
+     
+     // 当前工具调用轮次
+     private int currentToolCallRound = 0;
+
      @Data
      @NoArgsConstructor
      public static class PlanningThinkRes {
@@ -58,6 +66,8 @@
          private List<ToolCallPlan> toolsToCall;
          @JsonPropertyDescription("当前分析的思考过程")
          private String reasoning;
+         @JsonPropertyDescription("调用工具返回的结果整合")
+         private String callResult;
 
          @Override
          public String toString() {
@@ -92,115 +102,132 @@
 
      // 思考阶段的系统提示词
      private final String thinkSystemPrompt = """
-            你是一位资深的文学编辑和创作导师，专门负责制定小说章节的写作计划。你的任务是分析当前情况，确定需要获取哪些信息来制定最佳的写作计划。
+             你是一位资深的文学编辑和创作导师，专门负责制定小说章节的写作计划。你的任务是分析当前情况，确定需要获取哪些信息来制定最佳的写作计划。
 
-            **核心职责：**
-            1. **信息需求分析：** 分析当前已有信息，识别制定写作计划所需的关键信息缺口
-            2. **工具调用策略：** 确定需要调用哪些工具来获取必要信息
-            3. **信息充分性判断：** 判断当前信息是否足够制定详细的写作计划
+             **核心职责：**
+             1. **信息需求分析：** 分析当前已有信息，识别制定写作计划所需的关键信息缺口
+             2. **工具调用策略：** 确定需要调用哪些工具来获取必要信息
+             3. **信息充分性判断：** 判断当前信息是否足够制定详细的写作计划
 
-            **可用工具：**
-            - latest_content_get: 获取最新的章节内容，了解当前写作进度和上下文
-            - get_character_info: 获取特定角色的详细信息，包括性格、背景、关系等
-            - rag_query: 检索相关的背景信息、设定资料等
+             **可用工具：**
+             - latest_content_get: 获取最新的章节内容，了解当前写作进度和上下文
+             - get_character_info: 获取特定角色的详细信息，包括性格、背景、关系等
+             - rag_query: 检索相关的背景信息、设定资料等
 
-            **分析原则：**
-            1. **优先获取上下文：** 首先确保了解当前章节的写作状态和前文内容
-            2. **角色信息完整性：** 确保涉及的关键角色信息充分
-            3. **避免冗余调用：** 只调用真正需要的工具，避免获取无关信息
-            4. **信息质量优先：** 宁可多调用一次工具，也要确保信息的完整性和准确性
+             **分析原则：**
+             1. **优先获取上下文：** 首先确保了解当前章节的写作状态和前文内容
+             2. **角色信息完整性：** 确保涉及的关键角色信息充分
+             3. **避免冗余调用：** 只调用真正需要的工具，避免获取无关信息
+             4. **信息质量优先：** 宁可多调用一次工具，也要确保信息的完整性和准确性
 
-            **输出要求：**
-            - 如果信息不足，明确指出需要调用哪些工具及其目的
-            - 如果信息充足，可以开始制定写作计划
-            - 始终提供清晰的推理过程
-            """;
+             **输出要求：**
+             - 如果信息不足，明确指出需要调用哪些工具及其目的
+             - 如果信息充足，可以开始制定写作计划
+             - 始终提供清晰的推理过程
+             """;
 
      // 思考阶段的提示词模板
      private final String thinkPromptTemplate = """
-            ## 当前任务：制定章节写作计划
+             ## 当前任务：制定章节写作计划
 
-            **章节信息：**
-            - 章节ID: {chapterId}
-            - 项目ID: {projectId}
-            - 计划ID: {planId}
+             **章节信息：**
+             - 章节ID: {chapterId}
+             - 项目ID: {projectId}
+             - 计划ID: {planId}
+             - 当前工具调用轮次: {currentRound}/{maxRounds}
 
-            **当前上下文：**
-            {contextInfo}
+             **当前上下文：**
+             {contextInfo}
 
-            **已获取的工具信息：**
-            {gatheredInfo}
+             **已获取的工具信息：**
+             {gatheredInfo}
 
-            **分析要求：**
-            请分析当前情况，确定是否需要调用工具获取更多信息来制定写作计划。
+             **分析要求：**
+             请分析当前情况，确定是否需要调用工具获取更多信息来制定写作计划。
 
-            考虑以下方面：
-            1. 是否需要了解当前章节的最新内容和写作进度？
-            2. 是否需要获取关键角色的详细信息？
-            3. 是否需要检索相关的背景设定或前文信息？
-            4. 当前信息是否足够制定详细的分步写作计划？
+             考虑以下方面：
+             1. 是否需要了解当前章节的最新内容和写作进度？
+             2. 是否需要获取关键角色的详细信息？
+             3. 是否需要检索相关的背景设定或前文信息？
+             4. 当前信息是否足够制定详细的分步写作计划？
+             5. 是否已达到最大工具调用轮次限制？
 
-            输出格式：{format}
-            """;
+             输出格式：{format}
+             """;
+
+     // 工具调用阶段的系统提示词
+     private final String toolCallSystemPrompt = """
+             你是一位专业的小说创作助手。现在需要你调用指定的工具来获取制定写作计划所需的信息。
+
+             **重要说明：**
+             1. 你必须严格按照要求调用工具，不要跳过工具调用步骤
+             2. 工具调用完成后，请简要总结获取到的信息
+             3. 如果工具调用失败，请说明具体原因
+
+             **可用工具：**
+             - latest_content_get: 获取最新章节内容
+             - get_character_info: 获取角色详细信息
+             - rag_query: 检索相关背景信息
+             """;
 
      // 行动阶段的系统提示词
      private final String actionSystemPrompt = """
-            你是一位资深的文学编辑和创作导师，现在需要基于收集到的信息制定详细的章节写作计划。
+             你是一位资深的文学编辑和创作导师，现在需要基于收集到的信息制定详细的章节写作计划。
 
-            **核心任务：**
-            根据已收集的所有信息，制定一个结构化的、可执行的章节写作计划。
+             **核心任务：**
+             根据已收集的所有信息，制定一个结构化的、可执行的章节写作计划。
 
-            **计划制定原则：**
-            1. **目标明确：** 每个步骤都有清晰的写作目标和预期字数
-            2. **逻辑连贯：** 步骤之间有合理的逻辑关系和过渡
-            3. **细节具体：** 提供足够的细节指导，但不过度限制创作自由度
-            4. **可执行性：** 每个步骤都是可以直接执行的写作任务
+             **计划制定原则：**
+             1. **目标明确：** 每个步骤都有清晰的写作目标和预期字数
+             2. **逻辑连贯：** 步骤之间有合理的逻辑关系和过渡
+             3. **细节具体：** 提供足够的细节指导，但不过度限制创作自由度
+             4. **可执行性：** 每个步骤都是可以直接执行的写作任务
 
-            **输出要求：**
-            输出结构化的JSON格式写作计划，包含总体目标和分步计划。
-            """;
+             **输出要求：**
+             输出结构化的JSON格式写作计划，包含总体目标和分步计划。
+             """;
 
      // 行动阶段的提示词模板
      private final String actionPromptTemplate = """
-            ## 制定写作计划
+             ## 制定写作计划
 
-            **基础信息：**
-            - 章节ID: {chapterId}
-            - 项目ID: {projectId}
-            - 目标字数: {targetWordCount}
-            - 写作建议: {promptSuggestion}
+             **基础信息：**
+             - 章节ID: {chapterId}
+             - 项目ID: {projectId}
+             - 目标字数: {targetWordCount}
+             - 写作建议: {promptSuggestion}
 
-            **上下文信息：**
-            {contextInfo}
+             **上下文信息：**
+             {contextInfo}
 
-            **收集到的工具信息：**
-            {gatheredInfo}
+             **收集到的工具信息：**
+             {gatheredInfo}
 
-            **任务要求：**
-            基于以上所有信息，制定一个详细的章节写作计划。
+             **任务要求：**
+             基于以上所有信息，制定一个详细的章节写作计划。
 
-            计划应该包含：
-            1. 总体写作目标和主题
-            2. 分步骤的写作计划，每步包含：
+             计划应该包含：
+             1. 总体写作目标和主题
+             2. 分步骤的写作计划，每步包含：
                - 具体的写作内容描述
                - 预期字数
                - 重点关注的元素（角色、情节、氛围等）
 
-            请直接输出JSON格式的计划，格式参考：
-            {
-              "goal": "总体写作目标",
-              "planList": [
-                {
-                  "planContent": "第一步的具体写作内容",
-                  "goalWordCount": 300
-                },
-                {
-                  "planContent": "第二步的具体写作内容", 
-                  "goalWordCount": 400
-                }
-              ]
-            }
-            """;
+             请直接输出JSON格式的计划，格式参考：
+             {
+               "goal": "总体写作目标",
+               "planList": [
+                 {
+                   "planContent": "第一步的具体写作内容",
+                   "goalWordCount": 300
+                 },
+                 {
+                   "planContent": "第二步的具体写作内容", 
+                   "goalWordCount": 400
+                 }
+               ]
+             }
+             """;
 
      private BeanOutputConverter<PlanningThinkRes> thinkConverter = new BeanOutputConverter<>(PlanningThinkRes.class);
      private BeanOutputConverter<PlanRes> planConverter = new BeanOutputConverter<>(PlanRes.class);
@@ -209,6 +236,9 @@
      private Map<String, String> gatheredInfo = new HashMap<>();
      private boolean planningCompleted = false;
      private PlanRes finalPlan = null;
+     
+     // 存储最近一次的思考结果
+     private PlanningThinkRes lastThinkResult = null;
 
      public PlanningAgent(LlmService llmService, ChapterContentRequest request) {
          super(llmService, request);
@@ -222,6 +252,12 @@
                  return false;
              }
 
+             // 检查是否超过最大工具调用轮次
+             if (currentToolCallRound >= MAX_TOOL_CALL_ROUNDS) {
+                 log.info("[PlanningAgent-Think] 已达到最大工具调用轮次，强制进入计划制定阶段");
+                 return true; // 强制进入计划制定
+             }
+
              PlanContext planContext = this.chapterContentRequest.getPlanContext();
              planContext.setPlanState(PlanState.PLANNING);
              planContext.setMessage("正在分析信息需求...");
@@ -232,6 +268,8 @@
              templateData.put("chapterId", chapterContentRequest.getChapterId());
              templateData.put("projectId", chapterContentRequest.getChapterContext().getProjectId());
              templateData.put("planId", planContext.getPlanId());
+             templateData.put("currentRound", currentToolCallRound);
+             templateData.put("maxRounds", MAX_TOOL_CALL_ROUNDS);
              templateData.put("contextInfo", buildContextInfo());
              templateData.put("gatheredInfo", buildGatheredInfo());
              templateData.put("format", thinkConverter.getFormat());
@@ -259,6 +297,8 @@
                  return false;
              }
 
+             // 保存思考结果
+             lastThinkResult = thinkResult;
              log.info("[PlanningAgent-Think] 解析后的思考结果: {}", thinkResult);
 
              // 如果已有足够信息，准备进入计划制定阶段
@@ -287,12 +327,12 @@
          try {
              PlanContext planContext = this.chapterContentRequest.getPlanContext();
 
-             // 如果还没有足够信息，先调用工具
-             if (!hasEnoughInfoForPlanning()) {
+             // 如果还没有足够信息且未超过最大轮次，先调用工具
+             if (!hasEnoughInfoForPlanning() && currentToolCallRound < MAX_TOOL_CALL_ROUNDS) {
                  return executeToolCalls();
              }
 
-             // 如果有足够信息，制定最终计划
+             // 如果有足够信息或已达到最大轮次，制定最终计划
              return generateFinalPlan();
 
          } catch (Exception e) {
@@ -305,35 +345,68 @@
       * 执行工具调用获取信息
       */
      private AgentExecResult executeToolCalls() {
-         log.info("[PlanningAgent-Act] 开始调用工具获取信息");
+         log.info("[PlanningAgent-Act] 开始调用工具获取信息，当前轮次: {}", currentToolCallRound + 1);
 
          PlanContext planContext = this.chapterContentRequest.getPlanContext();
          planContext.setMessage("正在调用工具获取信息...");
 
-         // 构建工具调用提示词
-         String toolCallPrompt = buildToolCallPrompt();
+         try {
+             // 构建工具调用提示词
+             String toolCallPrompt = buildToolCallPrompt();
 
-         List<Message> messageList = new ArrayList<>();
-         messageList.add(new UserMessage(toolCallPrompt));
+             List<Message> messageList = new ArrayList<>();
+             messageList.add(new SystemMessage(toolCallSystemPrompt));
+             messageList.add(new UserMessage(toolCallPrompt));
 
-         log.info("[PlanningAgent-Act] 工具调用提示词: {}", toolCallPrompt);
+             log.info("[PlanningAgent-Act] 工具调用提示词: {}", toolCallPrompt);
 
-         // 调用LLM执行工具调用
-         String toolResult = llmService.getAgentChatClient(planId)
-                 .getChatClient()
-                 .prompt(new Prompt(messageList))
-                 .call()
-                 .content();
+             // 调用LLM执行工具调用（Spring AI会自动处理工具调用）
+             ChatResponse response = llmService.getAgentChatClient(planId)
+                     .getChatClient()
+                     .prompt(new Prompt(messageList))
+                     .call()
+                     .chatResponse();
 
-         log.info("[PlanningAgent-Act] 工具调用结果: {}", toolResult);
+                         // 处理工具调用结果
+            String toolResult = response.getResult().getOutput().getText();
+            List<AssistantMessage.ToolCall> toolCalls = response.getResult().getOutput().getToolCalls();
 
-         // 存储工具调用结果
-         String timestamp = String.valueOf(System.currentTimeMillis());
-         gatheredInfo.put("tool_result_" + timestamp, toolResult);
+             log.info("[PlanningAgent-Act] 工具调用完成，调用数量: {}", toolCalls != null ? toolCalls.size() : 0);
+             log.info("[PlanningAgent-Act] 工具调用结果: {}", toolResult);
 
-         planContext.setMessage("工具调用完成，继续分析...");
+             // 存储工具调用结果
+             String timestamp = String.valueOf(System.currentTimeMillis());
+             gatheredInfo.put("tool_result_round_" + (currentToolCallRound + 1) + "_" + timestamp, toolResult);
 
-         return new AgentExecResult("工具调用完成", AgentState.IN_PROGRESS);
+             // 如果有工具调用，存储详细信息
+             if (toolCalls != null && !toolCalls.isEmpty()) {
+                 for (int i = 0; i < toolCalls.size(); i++) {
+                     AssistantMessage.ToolCall toolCall = toolCalls.get(i);
+                     gatheredInfo.put("tool_call_" + (currentToolCallRound + 1) + "_" + i + "_" + timestamp, 
+                             "工具: " + toolCall.name() + ", 参数: " + toolCall.arguments());
+                 }
+             }
+
+             // 增加工具调用轮次
+             currentToolCallRound++;
+
+             planContext.setMessage("工具调用完成，继续分析...");
+
+             return new AgentExecResult("工具调用完成，轮次: " + currentToolCallRound, AgentState.IN_PROGRESS);
+
+         } catch (Exception e) {
+             log.error("[PlanningAgent-Act] 工具调用失败: {}", e.getMessage(), e);
+             
+             // 即使工具调用失败，也增加轮次计数，避免无限重试
+             currentToolCallRound++;
+             
+             // 存储错误信息
+             String timestamp = String.valueOf(System.currentTimeMillis());
+             gatheredInfo.put("tool_error_round_" + currentToolCallRound + "_" + timestamp, 
+                     "工具调用失败: " + e.getMessage());
+
+             return new AgentExecResult("工具调用失败，继续制定计划: " + e.getMessage(), AgentState.IN_PROGRESS);
+         }
      }
 
      /**
@@ -397,23 +470,42 @@
       */
      private String buildToolCallPrompt() {
          StringBuilder prompt = new StringBuilder();
-         prompt.append("请调用以下工具获取信息：\n\n");
+         prompt.append("请根据当前情况调用必要的工具获取信息：\n\n");
 
-         // 基本的工具调用
-         prompt.append("1. 调用 latest_content_get 工具获取最新内容\n");
-         prompt.append("   参数: chapterId=\"").append(chapterContentRequest.getChapterId()).append("\"");
-         prompt.append(", wordCount=1000");
-         prompt.append(", planId=\"").append(planId).append("\"\n\n");
+         // 如果是第一轮，优先获取最新内容
+         if (currentToolCallRound == 0) {
+             prompt.append("**第一优先级：获取最新内容**\n");
+             prompt.append("调用 latest_content_get 工具获取最新章节内容\n");
+             prompt.append("参数: chapterId=\"").append(chapterContentRequest.getChapterId()).append("\"");
+             prompt.append(", wordCount=1000");
+             prompt.append(", planId=\"").append(planId).append("\"\n\n");
+         }
 
-         // 如果有角色信息需求，调用角色工具
+         // 如果有角色信息且还未获取，调用角色工具
          if (chapterContentRequest.getChapterContext().getCharacters() != null &&
-                 !chapterContentRequest.getChapterContext().getCharacters().isEmpty()) {
-             prompt.append("2. 调用 get_character_info 工具获取主要角色信息\n");
-             prompt.append("   参数: chapterId=\"").append(chapterContentRequest.getChapterId()).append("\"");
+                 !chapterContentRequest.getChapterContext().getCharacters().isEmpty() &&
+                 !hasCharacterInfo()) {
+             prompt.append("**第二优先级：获取角色信息**\n");
+             prompt.append("调用 get_character_info 工具获取主要角色信息\n");
+             prompt.append("参数: chapterId=\"").append(chapterContentRequest.getChapterId()).append("\"");
              prompt.append(", projectId=\"").append(chapterContentRequest.getChapterContext().getProjectId()).append("\"");
              prompt.append(", name=\"").append(chapterContentRequest.getChapterContext().getCharacters().get(0).getName()).append("\"");
              prompt.append(", planId=\"").append(planId).append("\"\n\n");
          }
+
+                 // 如果需要更多背景信息，调用RAG工具
+        if (currentToolCallRound >= 1 && !hasRagInfo()) {
+            prompt.append("**第三优先级：检索相关信息**\n");
+            prompt.append("调用 rag_query 工具检索相关背景信息\n");
+            prompt.append("参数: chapterId=\"").append(chapterContentRequest.getChapterId()).append("\"");
+            prompt.append(", query=\"背景信息\"");
+            prompt.append(", planId=\"").append(planId).append("\"\n\n");
+        }
+
+         prompt.append("**重要提示：**\n");
+         prompt.append("1. 请严格按照上述参数调用工具\n");
+         prompt.append("2. 工具调用完成后，请简要总结获取到的信息\n");
+         prompt.append("3. 如果某个工具调用失败，请说明原因并继续其他工具调用\n");
 
          return prompt.toString();
      }
@@ -431,6 +523,14 @@
              if (chapterContentRequest.getChapterContext().getPreviousChapterSummary() != null) {
                  context.append("前章摘要: ").append(chapterContentRequest.getChapterContext().getPreviousChapterSummary()).append("\n");
              }
+
+             if (chapterContentRequest.getChapterContext().getCharacters() != null &&
+                     !chapterContentRequest.getChapterContext().getCharacters().isEmpty()) {
+                 context.append("主要角色: ");
+                 chapterContentRequest.getChapterContext().getCharacters().forEach(character -> 
+                     context.append(character.getName()).append(" "));
+                 context.append("\n");
+             }
          }
 
          return context.toString();
@@ -445,8 +545,15 @@
          }
 
          StringBuilder info = new StringBuilder();
+         info.append("已收集的信息：\n");
          for (Map.Entry<String, String> entry : gatheredInfo.entrySet()) {
-             info.append(entry.getKey()).append(": ").append(entry.getValue()).append("\n");
+             info.append("- ").append(entry.getKey()).append(": ");
+             String value = entry.getValue();
+             // 限制显示长度，避免提示词过长
+             if (value.length() > 200) {
+                 value = value.substring(0, 200) + "...";
+             }
+             info.append(value).append("\n");
          }
 
          return info.toString();
@@ -456,8 +563,36 @@
       * 判断是否有足够信息制定计划
       */
      private boolean hasEnoughInfoForPlanning() {
-         // 简单的判断逻辑：如果已经调用过工具获取信息，就认为有足够信息
-         return !gatheredInfo.isEmpty();
+         // 改进的判断逻辑
+         boolean hasBasicInfo = !gatheredInfo.isEmpty();
+         boolean hasContentInfo = gatheredInfo.keySet().stream()
+                 .anyMatch(key -> key.contains("latest_content") || key.contains("tool_result"));
+         boolean reachedMaxRounds = currentToolCallRound >= MAX_TOOL_CALL_ROUNDS;
+         
+         // 如果已达到最大轮次，强制认为信息充足
+         if (reachedMaxRounds) {
+             log.info("[PlanningAgent] 已达到最大工具调用轮次，强制认为信息充足");
+             return true;
+         }
+         
+         // 如果有基本信息且有内容信息，认为可以制定计划
+         return hasBasicInfo && hasContentInfo;
+     }
+
+     /**
+      * 检查是否已获取角色信息
+      */
+     private boolean hasCharacterInfo() {
+         return gatheredInfo.keySet().stream()
+                 .anyMatch(key -> key.contains("character") || key.contains("get_character_info"));
+     }
+
+     /**
+      * 检查是否已获取RAG信息
+      */
+     private boolean hasRagInfo() {
+         return gatheredInfo.keySet().stream()
+                 .anyMatch(key -> key.contains("rag") || key.contains("rag_query"));
      }
 
      @Override
@@ -489,12 +624,36 @@
      }
 
      /**
+      * 获取收集到的信息摘要
+      */
+     public Map<String, String> getGatheredInfo() {
+         return new HashMap<>(gatheredInfo);
+     }
+
+     /**
+      * 获取当前工具调用轮次
+      */
+     public int getCurrentToolCallRound() {
+         return currentToolCallRound;
+     }
+
+     /**
+      * 获取最后一次思考结果
+      */
+     public PlanningThinkRes getLastThinkResult() {
+         return lastThinkResult;
+     }
+
+     /**
       * 重置代理状态，用于新的计划制定任务
       */
      public void reset() {
          gatheredInfo.clear();
          planningCompleted = false;
          finalPlan = null;
+         lastThinkResult = null;
+         currentToolCallRound = 0;
          setState(AgentState.IN_PROGRESS);
+         log.info("[PlanningAgent] 代理状态已重置");
      }
  }
