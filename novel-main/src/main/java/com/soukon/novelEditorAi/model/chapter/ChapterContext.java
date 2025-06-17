@@ -97,6 +97,11 @@ public class ChapterContext {
      * 下一章节内容摘要
      */
     private String nextChapterSummary;
+
+    /**
+     * 下一章节内容摘要
+     */
+    private Chapter nextChapter;
     
     /**
      * 主要人物列表

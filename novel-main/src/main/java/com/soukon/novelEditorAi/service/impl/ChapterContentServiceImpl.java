@@ -74,7 +74,7 @@ public class ChapterContentServiceImpl implements ChapterContentService {
     private final CharacterRelationshipService characterRelationshipService;
     private final OutlinePlotPointService outlinePlotPointService;
     @Autowired
-    private  ItemService itemService;
+    private ItemService itemService;
 
     @Getter
     private ConcurrentHashMap<String, PlanContext> planContextMap = new ConcurrentHashMap<>();
@@ -301,7 +301,7 @@ public class ChapterContentServiceImpl implements ChapterContentService {
         Chapter nextChapter = chapterMapper.selectByProjectIdAndOrder(
                 projectId, chapter.getSortOrder() + 1);
         if (nextChapter != null) {
-            contextBuilder.nextChapterSummary(nextChapter.getSummary());
+            contextBuilder.nextChapter(nextChapter);
         }
 
         // 获取章节关联的情节
@@ -337,6 +337,9 @@ public class ChapterContentServiceImpl implements ChapterContentService {
         // 查询并构建章节上下文
         ChapterContext context = buildChapterContext(request.getChapterId());
         request.setChapterContext(context);
+        // 构建提示词
+        String chapterContextStr = buildChapterContextStr(request);
+        request.setChapterContextStr(chapterContextStr);
 
         // 设置默认参数
         if (request.getMaxTokens() == null) {
@@ -367,19 +370,19 @@ public class ChapterContentServiceImpl implements ChapterContentService {
             planningParams.put("projectId", context.getProjectId());
             planningParams.put("targetWordCount", request.getMaxTokens());
             planningParams.put("promptSuggestion", request.getPromptSuggestion());
-            
+
             // 执行计划制定
             planningAgent.run(planningParams);
-            
+
             // 获取制定的计划
             planRes = planningAgent.getFinalPlan();
-            
+
             log.info("[Planning] PlanningAgent完成计划制定: {}", planRes);
         } catch (Exception e) {
             log.error("[Planning] PlanningAgent计划制定失败: {}", e.getMessage(), e);
             throw new RuntimeException("制定写作计划失败：" + e.getMessage(), e);
         }
-        
+
         if (planRes == null) {
             log.error("[Planning] PlanningAgent计划制定结果为空");
             throw new RuntimeException("制定写作计划失败：结果为空");
@@ -387,7 +390,7 @@ public class ChapterContentServiceImpl implements ChapterContentService {
 
         // 将planRes的completePercent保存到数据库
         Plot plot = request.getCurrentPlot();
-        if (!request.isFreedom()){
+        if (!request.isFreedom()) {
             plot.setCompletionPercentage(100);
             plotService.updateById(plot);
         }
@@ -424,7 +427,7 @@ public class ChapterContentServiceImpl implements ChapterContentService {
         for (PlanDetailRes planStep : planList) {
             log.info("[Planing] 执行写作计划步骤: {}", planStep);
             planContext.setMessage("正在执行写作计划步骤：" + planStep.getPlanContent());
-            planContext.setProgress(10 + (index-1) * 90 / planList.size());
+            planContext.setProgress(10 + (index - 1) * 90 / planList.size());
             writingAgent.setState(AgentState.IN_PROGRESS);
             Map<String, Object> executorParams = new HashMap<>();
             executorParams.put("stepContent", planStep.getPlanContent());
@@ -441,5 +444,99 @@ public class ChapterContentServiceImpl implements ChapterContentService {
             writingAgent.run(executorParams);
         }
         llmService.removeAgentChatClient(planContext.getPlanId());
+    }
+
+    private String buildChapterContextStr(ChapterContentRequest request) {
+        StringBuilder userPromptBuilder = new StringBuilder();
+        ChapterContext context = request.getChapterContext();
+
+        //第一部分：小说元数据
+        userPromptBuilder.append("## 1. 小说元数据\n");
+
+        // 项目信息
+        if (context.getProject() != null) {
+            userPromptBuilder.append(projectService.toPrompt(context.getProject())).append("\n");
+        }
+
+        // 角色信息
+        if (context.getCharacters() != null && !context.getCharacters().isEmpty()) {
+            userPromptBuilder.append("### 主要角色\n");
+            context.getCharacters().forEach(character -> userPromptBuilder.append(characterService.toPrompt(character)));
+            userPromptBuilder.append("\n");
+        }
+
+        // 角色关系信息
+        if (context.getCharacterRelationships() != null && !context.getCharacterRelationships().isEmpty()) {
+            userPromptBuilder.append("### 角色关系\n");
+            context.getCharacterRelationships().forEach(rel -> userPromptBuilder.append(characterRelationshipService.toPrompt(rel)));
+            userPromptBuilder.append("\n");
+        }
+
+        // 大纲情节点信息
+        if (context.getPlotPoints() != null && !context.getPlotPoints().isEmpty()) {
+            userPromptBuilder.append("### 小说整体大纲\n");
+            context.getPlotPoints().forEach(point -> userPromptBuilder.append(outlinePlotPointService.toPrompt(point)));
+            userPromptBuilder.append("\n");
+        }
+
+        // 第二部分：写作目标
+        userPromptBuilder.append("## 2. 写作目标\n");
+
+        // 添加写作目标的具体要求
+        Chapter currentChapter = context.getCurrentChapter();
+        if (currentChapter != null) {
+            userPromptBuilder.append("### 写作要求\n");
+            if (currentChapter.getWordCountGoal() != null) {
+                userPromptBuilder.append("- 本章节的目标字数：").append(currentChapter.getWordCountGoal()).append("字\n");
+            }
+            if (request.getWordCountSuggestion() != null) {
+                userPromptBuilder.append("- 当前目标字数：").append(request.getWordCountSuggestion()).append("字（必须严格遵守，优先级高于章节目标字数或其他字数要求）\n");
+            }
+            if (currentChapter.getContent() != null && !currentChapter.getContent().isEmpty()) {
+                userPromptBuilder.append("- 类型：续写\n");
+            } else {
+                userPromptBuilder.append("- 类型：创作\n");
+            }
+            userPromptBuilder.append("- 写作建议：").append(request.getPromptSuggestion()).append("\n");
+
+            userPromptBuilder.append("\n");
+        }
+
+        // 第三部分：当前写作进度和章节信息
+        userPromptBuilder.append("## 3. 当前写作进度和章节信息\n");
+
+        // 章节信息
+        String previousChapterSummary = context.getPreviousChapter() != null ? context.getPreviousChapter().getSummary() : null;
+        if (currentChapter != null) {
+            userPromptBuilder.append(chapterService.toPrompt(currentChapter, previousChapterSummary));
+            userPromptBuilder.append("\n");
+        }
+
+        // 已有内容
+        Long chapterId = context.getCurrentChapter().getId();
+        String latestChapterContent = chapterService.getLatestChapterContent(chapterId, 2000);
+        if (latestChapterContent != null && !latestChapterContent.isEmpty()) {
+            userPromptBuilder.append("### 已有内容\n");
+            userPromptBuilder.append(latestChapterContent).append("\n\n");
+        } else {
+            userPromptBuilder.append("已有内容为空\n");
+        }
+
+        Plot firstIncompletePlot = plotService.getFirstIncompletePlot(chapterId);
+        if (firstIncompletePlot != null) {
+            userPromptBuilder.append("### 需要创作的情节\n");
+            String globalContext = plotService.toPrompt(firstIncompletePlot);
+            request.setGlobalContext(globalContext);
+            userPromptBuilder.append(globalContext);
+            userPromptBuilder.append("\n");
+            request.setCurrentPlot(firstIncompletePlot);
+        } else {
+            userPromptBuilder.append("没有需要创作的情节，根据上文和目标字数创作\n");
+            Plot plot = new Plot();
+            plot.setWordCountGoal(request.getWordCountSuggestion());
+            plot.setDescription("根据上文和目标字数创作,相关建议为" + request.getPromptSuggestion());
+        }
+
+        return userPromptBuilder.toString();
     }
 } 

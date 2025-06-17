@@ -34,6 +34,11 @@ public class ChapterContentRequest {
      */
     private ChapterContext chapterContext;
 
+    /**
+     * 整合上下文的提示词
+     */
+    private String chapterContextStr;
+
 
     /**
      * 上下文
