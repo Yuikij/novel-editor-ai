@@ -126,6 +126,10 @@
              - 始终提供清晰的推理过程
              """;
 
+
+//
+//             **当前上下文：**
+//     {contextInfo}
      // 思考阶段的提示词模板
      private final String thinkPromptTemplate = """
              ## 当前任务：制定章节写作计划
@@ -136,8 +140,6 @@
              - 计划ID: {planId}
              - 当前工具调用轮次: {currentRound}/{maxRounds}
 
-             **当前上下文：**
-             {contextInfo}
 
              ## 已经调用工具收集到的信息：
              {toolsCallResult}

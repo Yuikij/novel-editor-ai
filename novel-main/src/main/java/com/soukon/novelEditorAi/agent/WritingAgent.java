@@ -128,7 +128,7 @@ public class WritingAgent extends ReActAgent {
             """;
 
     private final String thinkPromptTemplate = """
-                        
+
             思考：
             
             当前计划相关信息：{planInfo}
@@ -152,12 +152,7 @@ public class WritingAgent extends ReActAgent {
                         
             你上次思考的结果是:
             {currentThink}
-            
-            可用工具为：
-            - latest_content_get: 获取目前小说的最新内容，如果该章节有内容，则返回最新的内容，如果没有内容，则返回上一章节内容
-
-                
-                        
+                 
             在继续写作前，结合上下文，执行以下步骤：            
             
             **进行深度且避免重复的结构化思考**
@@ -252,8 +247,6 @@ public class WritingAgent extends ReActAgent {
 * */
     private final String actionPromptTemplate = """
             
-            当前计划相关信息：{planInfo}
-           
             执行写作计划中的第{stepNumber}步：{stepContent}，目标字数为：{goalWordCount}。
                         
             该步骤所属的情节大纲为：{plot}
@@ -267,10 +260,6 @@ public class WritingAgent extends ReActAgent {
             你上次完成的内容是:
             {previousContent}
             
-            可用工具为：
-            - latest_content_get: 获取目前小说的最新内容，如果该章节有内容，则返回最新的内容，如果没有内容，则返回上一章节内容
-            - get_character_info: 根据角色名称获取角色相关信息
-                        
             写作指南：
             - 仔细阅读上次完成的内容，**严格避免任何形式的与前文的重复或高度相似的表述、情节及对话。警惕并主动规避那些听起来像标准模板、缺乏个性、过度解释或逻辑过于完美的‘AI式’表达。**
             - **在力求达到目标字数({goalWordCount})的同时，优先确保故事的自然发展和情节的完整性。如果为了更好地完成当前场景的核心叙事任务或展现关键细节，字数略有超出或不足（例如在±15%范围内），是可以接受的，但请确保每一句话都有其存在的价值。**
