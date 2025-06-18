@@ -21,6 +21,7 @@
  import com.soukon.novelEditorAi.model.chapter.PlanContext;
  import com.soukon.novelEditorAi.model.chapter.PlanState;
  import com.soukon.novelEditorAi.model.chapter.PlanRes;
+ import lombok.AllArgsConstructor;
  import lombok.Data;
  import lombok.NoArgsConstructor;
  import org.slf4j.Logger;
@@ -52,41 +53,66 @@
      private static final Logger log = LoggerFactory.getLogger(PlanningAgent.class);
 
      // 最大工具调用轮次，防止无限循环
-     private static final int MAX_TOOL_CALL_ROUNDS = 3;
+     private static final int MAX_TOOL_CALL_ROUNDS = 5;
 
      // 当前工具调用轮次
-     private int currentToolCallRound = 0;
+     private int currentToolCallRound = 1;
+     private Boolean hasEnoughInfo = false;
 
      @Data
      @NoArgsConstructor
      public static class PlanningThinkRes {
          @JsonPropertyDescription("当前是否已经收集到足够的信息来制定计划")
          private Boolean hasEnoughInfo;
-         @JsonPropertyDescription("需要调用的工具列表，如果hasEnoughInfo为true则可以为空")
-         private List<ToolCallPlan> toolsToCall;
-         @JsonPropertyDescription("当前分析的思考过程")
-         private String reasoning;
+         //         @JsonPropertyDescription("已经调用的工具列表，如果hasEnoughInfo为true则可以为空")
+//         private List<ToolCallPlan> toolsToCall;
+//         @JsonPropertyDescription("当前分析的思考过程")
+//         private String reasoning;
          @JsonPropertyDescription("调用工具返回的结果整合")
-         private String callResult;
+         private List<ToolCallResult> callResult;
+
+         public static String fromToolCallResult(List<ToolCallResult> callResult) {
+             if (callResult == null || callResult.isEmpty()) {
+                 return "";
+             }
+             StringBuilder sb = new StringBuilder();
+             sb.append("调用工具返回的结果整合：\n");
+             callResult.forEach(result -> {
+                 sb.append("  工具: ").append(result.getToolName())
+                         .append(", 结果: ").append(result.getResult()).append("\n");
+             });
+
+             return sb.toString();
+         }
 
          @Override
          public String toString() {
              StringBuilder sb = new StringBuilder();
              sb.append("计划制定思考结果：\n");
-             sb.append("推理过程：").append(reasoning).append("\n");
+//             sb.append("推理过程：").append(reasoning).append("\n");
              sb.append("是否有足够信息：").append(hasEnoughInfo ? "是" : "否").append("\n");
 
-             if (toolsToCall != null && !toolsToCall.isEmpty()) {
-                 sb.append("需要调用的工具：\n");
-                 for (int i = 0; i < toolsToCall.size(); i++) {
-                     ToolCallPlan tool = toolsToCall.get(i);
-                     sb.append("  ").append(i + 1).append(". ").append(tool.getToolName())
-                             .append(" - ").append(tool.getPurpose()).append("\n");
-                 }
-             }
-             sb.append("调用工具返回的结果整合：").append(callResult).append("\n");
+//             if (toolsToCall != null && !toolsToCall.isEmpty()) {
+//                 sb.append("需要调用的工具：\n");
+//                 for (int i = 0; i < toolsToCall.size(); i++) {
+//                     ToolCallPlan tool = toolsToCall.get(i);
+//                     sb.append("  ").append(i + 1).append(". ").append(tool.getToolName())
+//                             .append(" - ").append(tool.getPurpose()).append("\n");
+//                 }
+//             }
+             sb.append("调用工具返回的结果整合：").append(fromToolCallResult(callResult)).append("\n");
              return sb.toString();
          }
+     }
+
+     @Data
+     @NoArgsConstructor
+     @AllArgsConstructor
+     public static class ToolCallResult {
+         @JsonPropertyDescription("工具名称")
+         private String toolName;
+         @JsonPropertyDescription("调用此工具的结果")
+         private String result;
      }
 
      @Data
@@ -100,15 +126,19 @@
          private Map<String, Object> parameters;
      }
 
+     //
      // 思考阶段的系统提示词
      private final String thinkSystemPrompt = """
-             你是一位资深的文学编辑和创作导师，专门负责制定小说章节的写作计划。你的任务是分析当前情况，确定需要获取哪些信息来制定最佳的写作计划。
+             你是一位资深的文学编辑和创作导师，专门负责制定小说章节的写作计划。你的任务是分析当前情况，调用工具来获取制定写作计划所需的信息。
+
+              **重要说明：**
+             1. 你必须严格按照要求调用工具，不要跳过工具调用步骤
+             2. 工具调用完成后，输出获取到的信息
 
              **核心职责：**
              1. **信息需求分析：** 分析当前已有信息，识别制定写作计划所需的关键信息缺口
-             2. **工具调用策略：** 确定需要调用哪些工具来获取必要信息并且执行工具调用
-             3. **执行工具调用：** 通过执行工具调用，获取相关信息
-             4. **信息充分性判断：** 判断当前信息是否足够制定详细的写作计划
+             2. **执行工具调用：** 确定需要调用哪些工具来获取必要信息并且执行工具调用，通过执行工具调用，获取相关信息
+             3. **信息充分性判断：** 判断当前信息是否足够制定详细的写作计划
 
              **可用工具：**
              - latest_content_get: 获取最新的章节内容，了解当前写作进度和上下文
@@ -122,18 +152,18 @@
              4. **信息质量优先：** 宁可多调用一次工具，也要确保信息的完整性和准确性
 
              **输出要求：**
-             - 如果信息不足，明确指出需要调用哪些工具及其目的，并且调用工具获取结果
+             - 如果信息不足，调用工具获取相关结果
              - 如果信息充足，可以开始制定写作计划
-             - 始终提供清晰的推理过程
+             - 严格输出结构化json格式，不需要额外的任何解释说明！
              """;
 
 
-//
+     //
 //             **当前上下文：**
 //     {contextInfo}
      // 思考阶段的提示词模板
      private final String thinkPromptTemplate = """
-             ## 当前任务：制定章节写作计划
+             ## 当前任务：为了制定情节写作计划，调用必要的工具
 
              **章节信息：**
              - 章节ID: {chapterId}
@@ -141,12 +171,21 @@
              - 计划ID: {planId}
              - 当前工具调用轮次: {currentRound}/{maxRounds}
 
+             **重要说明：**
+             1. 你必须严格按照要求调用工具，不要跳过工具调用步骤
+             2. 工具调用完成后，请简要总结获取到的信息
+             3. 如果工具调用失败，请说明具体原因
+                          
+             **可用工具：**
+             - latest_content_get: 获取最新章节内容
+             - get_character_info: 获取角色详细信息
+             - rag_query: 检索相关背景信息
 
              ## 已经调用工具收集到的信息：
              {toolsCallResult}
 
              **分析要求：**
-             请分析当前情况，确定是否需要调用工具获取更多信息来制定写作计划。
+             请分析当前情况，确定是否需要调用工具获取更多信息来制定写作计划，如果有，立刻调用工具获得相关信息。
 
              考虑以下方面：
              1. 是否需要了解当前章节的最新内容和写作进度？
@@ -154,6 +193,8 @@
              3. 是否需要检索相关的背景设定或前文信息？
              4. 当前信息是否足够制定详细的分步写作计划？
              5. 是否已达到最大工具调用轮次限制？
+
+             严格输出结构化json格式，不需要额外的任何解释说明！
 
              输出格式：{format}
              """;
@@ -256,6 +297,7 @@
              // 检查是否超过最大工具调用轮次
              if (currentToolCallRound >= MAX_TOOL_CALL_ROUNDS) {
                  log.info("[PlanningAgent-Think] 已达到最大工具调用轮次，强制进入计划制定阶段");
+                 hasEnoughInfo = true;
                  return true; // 强制进入计划制定
              }
 
@@ -298,25 +340,28 @@
                  return false;
              }
              this.toolsCallResult = this.toolsCallResult + "\n"
-                                    + "第" + currentToolCallRound + "次工具调用结果：\n" + thinkResult.getCallResult();
+                                    + "第" + currentToolCallRound + "次工具调用结果：\n" +
+                                    PlanningThinkRes.fromToolCallResult(thinkResult.getCallResult());
              // 保存思考结果
              lastThinkResult = thinkResult;
              log.info("[PlanningAgent-Think] 解析后的思考结果: {}", thinkResult);
 
              // 如果已有足够信息，准备进入计划制定阶段
-             if (Boolean.TRUE.equals(thinkResult.getHasEnoughInfo())) {
-                 log.info("[PlanningAgent-Think] 信息充足，准备制定计划");
-                 return true; // 需要执行行动（制定计划）
-             }
+//             if (Boolean.TRUE.equals(thinkResult.getHasEnoughInfo())) {
+//                 log.info("[PlanningAgent-Think] 信息充足，准备制定计划");
+//                 return true; // 需要执行行动（制定计划）
+//             }
 
+             hasEnoughInfo = thinkResult.getHasEnoughInfo();
+             currentToolCallRound = currentToolCallRound + 1;
              // 如果需要调用工具，也返回true进入行动阶段
-             if (thinkResult.getToolsToCall() != null && !thinkResult.getToolsToCall().isEmpty()) {
-                 log.info("[PlanningAgent-Think] 需要调用工具获取信息: {}", thinkResult.getToolsToCall().size());
-                 return true; // 需要执行行动（调用工具）
-             }
+//             if (thinkResult.getToolsToCall() != null && !thinkResult.getToolsToCall().isEmpty()) {
+//                 log.info("[PlanningAgent-Think] 需要调用工具获取信息: {}", thinkResult.getToolsToCall().size());
+//                 return true; // 需要执行行动（调用工具）
+//             }
 
-             log.warn("[PlanningAgent-Think] 思考结果不明确，跳过行动");
-             return false;
+//             log.warn("[PlanningAgent-Think] 思考结果不明确，跳过行动");
+             return true;
 
          } catch (Exception e) {
              log.error("[PlanningAgent-Think] 思考阶段执行失败: {}", e.getMessage(), e);
@@ -329,6 +374,10 @@
          try {
              PlanContext planContext = this.chapterContentRequest.getPlanContext();
 
+             if (!Boolean.TRUE.equals(hasEnoughInfo)) {
+                 log.info("[PlanningAgent-Act] 信息不充足，跳过执行");
+                 return new AgentExecResult("计划信息不充足，跳过执行", AgentState.IN_PROGRESS); // 需要执行行动（制定计划）
+             }
              // 如果还没有足够信息且未超过最大轮次，先调用工具
 //             if (!hasEnoughInfoForPlanning() && currentToolCallRound < MAX_TOOL_CALL_ROUNDS) {
 //                 return executeToolCalls();
