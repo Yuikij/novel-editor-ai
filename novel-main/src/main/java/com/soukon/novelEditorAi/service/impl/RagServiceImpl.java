@@ -78,27 +78,69 @@ public class RagServiceImpl implements RagService {
 
 
     public void createDocument(String content, Map<String, Object> metadata) {
-        // 使用 TextReader 读取文档
-        TextReader textReader = new TextReader(content);
-        // 设置元数据
-        textReader.getCustomMetadata().put("source", "法国");
-        // 分块文档
-        // 对于文风分析，建议使用更大的分块以保持文本连贯性
-        TokenTextSplitter splitter = new TokenTextSplitter(
-                500,   // 最大令牌数，减小到 50，确保低于 512
-                20,   // 最小令牌数
-                5,    // 块重叠令牌数
-                Integer.MAX_VALUE, // 移除 maxChunks 限制
-                true  // 保留分隔符
-        );
-        List<Document> documents = splitter.apply(textReader.get());
+        try {
+            // 检查内容是否有效
+            if (content == null || content.isEmpty()) {
+                log.warn("无法创建文档：内容为空");
+                return;
+            }
 
-        log.info("分块后的文档数量: {}", documents.size());
+            // 如果元数据为空，创建一个空的Map
+            if (metadata == null) {
+                metadata = new HashMap<>();
+            }
 
-        // 存储到向量存储
-        log.info("Adding documents to vector store...");
-        vectorStore.add(documents);
-        log.info("Documents added successfully.");
+            // 添加时间戳到元数据中
+            metadata.put("timestamp", System.currentTimeMillis());
+
+            // 生成文档ID，如果元数据中没有指定
+            String documentId = (String) metadata.get("id");
+            if (documentId == null || documentId.isEmpty()) {
+                documentId = "doc-" + System.currentTimeMillis();
+                metadata.put("id", documentId);
+            }
+
+            // 检查内容长度，如果超过限制则进行分片
+            final int MAX_CONTENT_LENGTH = 500; // 大约对应400-500 tokens，保守估计
+            
+            if (content.length() <= MAX_CONTENT_LENGTH) {
+                // 内容较短，直接创建单个文档
+                Document document = new Document(documentId, content, metadata);
+                vectorStore.add(Collections.singletonList(document));
+                log.info("成功创建文档: {}", documentId);
+            } else {
+                // 内容较长，需要分片处理
+                log.info("文档内容过长({} 字符)，开始分片处理", content.length());
+                
+                // 使用现有的分片方法
+                List<String> chunks = chunkText(content, chunkSize, chunkOverlap);
+                List<Document> documents = new ArrayList<>();
+                
+                // 为每个分片创建文档
+                for (int i = 0; i < chunks.size(); i++) {
+                    // 复制元数据并添加分片信息
+                    Map<String, Object> chunkMetadata = new HashMap<>(metadata);
+                    chunkMetadata.put("id", documentId + "-chunk-" + i);
+                    chunkMetadata.put("chunkIndex", i);
+                    chunkMetadata.put("totalChunks", chunks.size());
+                    chunkMetadata.put("originalDocumentId", documentId);
+                    
+                    Document chunkDoc = new Document(
+                        documentId + "-chunk-" + i,
+                        chunks.get(i),
+                        chunkMetadata
+                    );
+                    documents.add(chunkDoc);
+                }
+                
+                // 批量添加所有分片到向量存储
+                vectorStore.add(documents);
+                log.info("成功创建文档 {} 的 {} 个分片", documentId, chunks.size());
+            }
+            
+        } catch (Exception e) {
+            log.error("创建文档时发生错误: {}", e.getMessage(), e);
+        }
     }
 
     @Override
@@ -465,11 +507,28 @@ public class RagServiceImpl implements RagService {
                 chunks.add(chunk);
             }
 
-            // 下一个块的起始位置，考虑重叠
-            start = end - overlap;
-            if (start < 0 || start >= end) { // 确保进度是向前的
-                start = end;
+            // 如果已经处理到文本末尾，直接退出
+            if (end >= textLength) {
+                break;
             }
+
+            // 下一个块的起始位置，考虑重叠
+            int nextStart = end - overlap;
+            
+            // 确保进度是向前的，避免重复处理
+            if (nextStart < 0) {
+                nextStart = 0;
+            }
+            if (nextStart >= end) {
+                nextStart = end;
+            }
+            
+            // 如果下一个起始位置没有向前移动，强制向前移动
+            if (nextStart <= start) {
+                nextStart = start + 1;
+            }
+            
+            start = nextStart;
 
             // 控制块数量，防止无限循环
             if (chunks.size() >= 2 * estimatedChunks) {
