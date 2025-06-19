@@ -44,4 +44,22 @@ public interface PlotService extends IService<Plot> {
      * @return 第一个未完成的情节，如果所有情节都已完成或没有情节则返回null
      */
     Plot getFirstIncompletePlot(Long chapterId);
+    
+    /**
+     * 获取指定情节的上一个情节
+     *
+     * @param currentPlot 当前情节
+     * @return 上一个情节，如果没有则返回null
+     */
+    Plot getPreviousPlot(Plot currentPlot);
+    
+    /**
+     * 验证并处理情节的sortOrder，确保在同一章节中不重复
+     * 如果发生重复，会自动调整后续情节的sortOrder
+     *
+     * @param plot 待验证的情节
+     * @param isUpdate 是否为更新操作（true）还是新增操作（false）
+     * @throws IllegalArgumentException 如果参数无效
+     */
+    void validateAndHandleSortOrder(Plot plot, boolean isUpdate);
 } 

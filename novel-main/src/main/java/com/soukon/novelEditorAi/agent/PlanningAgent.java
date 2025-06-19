@@ -157,10 +157,6 @@
              - 严格输出结构化json格式，不需要额外的任何解释说明！
              """;
 
-
-     //
-//             **当前上下文：**
-//     {contextInfo}
      // 思考阶段的提示词模板
      private final String thinkPromptTemplate = """
              ## 当前任务：为了制定情节写作计划，调用必要的工具
@@ -180,9 +176,13 @@
              - latest_content_get: 获取最新章节内容
              - get_character_info: 获取角色详细信息
              - rag_query: 检索相关背景信息
+                          
+             ## 上下文信息：
+             {contextInfo}
 
              ## 已经调用工具收集到的信息：
              {toolsCallResult}
+
 
              **分析要求：**
              请分析当前情况，确定是否需要调用工具获取更多信息来制定写作计划，如果有，立刻调用工具获得相关信息。
@@ -325,7 +325,7 @@
              messageList.add(systemMessage);
              messageList.add(thinkMessage);
 
-             log.info("[PlanningAgent-Think] 开始思考分析...");
+             log.info("[PlanningAgent-Think] 开始思考分析..." + messageList);
              String content = llmService.getAgentChatClient(planId)
                      .getChatClient()
                      .prompt(new Prompt(messageList))
@@ -342,8 +342,11 @@
              this.toolsCallResult = this.toolsCallResult + "\n"
                                     + "第" + currentToolCallRound + "次工具调用结果：\n" +
                                     PlanningThinkRes.fromToolCallResult(thinkResult.getCallResult());
+
+             this.chapterContentRequest.setToolsCallResult(this.toolsCallResult);
              // 保存思考结果
              lastThinkResult = thinkResult;
+
              log.info("[PlanningAgent-Think] 解析后的思考结果: {}", thinkResult);
 
              // 如果已有足够信息，准备进入计划制定阶段
@@ -403,7 +406,7 @@
              messageList.add(systemMessage);
              messageList.add(actionMessage);
 
-             log.info("[PlanningAgent-Act] 开始生成写作计划...");
+             log.info("[PlanningAgent-Act] 开始生成写作计划..." + messageList);
              String planContent = llmService.getAgentChatClient(planId)
                      .getChatClient()
                      .prompt(new Prompt(messageList))

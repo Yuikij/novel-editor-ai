@@ -35,13 +35,10 @@ import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Flux;
 import org.springframework.context.annotation.Lazy;
 
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.time.LocalDateTime;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.HashMap;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -275,14 +272,42 @@ public class ChapterContentServiceImpl implements ChapterContentService {
             contextBuilder.world(world);
         }
 
-        // 获取角色信息
-        List<Character> characters = characterMapper.selectListByProjectId(projectId);
+        // 获取需要写作的情节
+        Plot firstIncompletePlot = plotService.getFirstIncompletePlot(chapterId);
+        if (firstIncompletePlot != null) {
+            contextBuilder.firstIncompletePlot(firstIncompletePlot);
+        }
+
+        // 获取角色信息 - 根据firstIncompletePlot所关联的情节获取相关角色
+        List<Character> characters = null;
+        if (firstIncompletePlot != null && firstIncompletePlot.getCharacterIds() != null && !firstIncompletePlot.getCharacterIds().isEmpty()) {
+            // 根据情节关联的角色ID获取角色信息
+            characters = characterMapper.selectListByIds(firstIncompletePlot.getCharacterIds());
+        }
+        
+        // 如果没有关联角色或获取失败，则回退到获取项目所有角色
+        if (characters == null || characters.isEmpty()) {
+            characters = characterMapper.selectListByProjectId(projectId);
+        }
+        
         if (characters != null && !characters.isEmpty()) {
             contextBuilder.characters(characters);
         }
 
-        // 获取角色关系
-        List<CharacterRelationship> relationships = characterRelationshipService.getByProjectId(projectId);
+        // 获取角色关系 - 根据已经获取的角色列表查询相关关系
+        List<CharacterRelationship> relationships = null;
+        if (characters != null && !characters.isEmpty()) {
+            // 提取角色ID列表
+            List<Long> characterIds = characters.stream()
+                    .map(Character::getId)
+                    .filter(Objects::nonNull)
+                    .toList();
+            
+            if (!characterIds.isEmpty()) {
+                relationships = characterRelationshipService.getByCharacterIds(characterIds);
+            }
+        }
+        
         if (relationships != null && !relationships.isEmpty()) {
             contextBuilder.characterRelationships(relationships);
         }
@@ -522,7 +547,7 @@ public class ChapterContentServiceImpl implements ChapterContentService {
             userPromptBuilder.append("已有内容为空\n");
         }
 
-        Plot firstIncompletePlot = plotService.getFirstIncompletePlot(chapterId);
+        Plot firstIncompletePlot = context.getFirstIncompletePlot();
         if (firstIncompletePlot != null) {
             userPromptBuilder.append("### 需要创作的情节\n");
             String globalContext = plotService.toPrompt(firstIncompletePlot);
@@ -530,12 +555,36 @@ public class ChapterContentServiceImpl implements ChapterContentService {
             userPromptBuilder.append(globalContext);
             userPromptBuilder.append("\n");
             request.setCurrentPlot(firstIncompletePlot);
+
+            // 上一个情节的基本信息
+            Plot previousPlot = plotService.getPreviousPlot(firstIncompletePlot);
+            if (previousPlot != null) {
+                userPromptBuilder.append("### 上一个情节信息\n");
+                userPromptBuilder.append(plotService.toPrompt(previousPlot));
+                userPromptBuilder.append("\n");
+            }
         } else {
             userPromptBuilder.append("没有需要创作的情节，根据上文和目标字数创作\n");
             Plot plot = new Plot();
             plot.setWordCountGoal(request.getWordCountSuggestion());
             plot.setDescription("根据上文和目标字数创作,相关建议为" + request.getPromptSuggestion());
         }
+
+        // 上一章节的基本信息
+        Chapter previousChapter = context.getPreviousChapter();
+        if (previousChapter != null) {
+            userPromptBuilder.append("### 上一章节信息\n");
+            userPromptBuilder.append("章节标题: ").append(previousChapter.getTitle()).append("\n");
+            if (previousChapter.getSummary() != null && !previousChapter.getSummary().isEmpty()) {
+                userPromptBuilder.append("章节概要: ").append(previousChapter.getSummary()).append("\n");
+            }
+            if (previousChapter.getWordCount() != null) {
+                userPromptBuilder.append("章节字数: ").append(previousChapter.getWordCount()).append("字\n");
+            }
+            userPromptBuilder.append("\n");
+        }
+
+
 
         return userPromptBuilder.toString();
     }

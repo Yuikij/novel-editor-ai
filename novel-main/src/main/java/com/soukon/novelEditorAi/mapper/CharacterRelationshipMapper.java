@@ -18,4 +18,22 @@ public interface CharacterRelationshipMapper extends BaseMapper<CharacterRelatio
      */
     @Select("SELECT * FROM character_relationships WHERE project_id = #{projectId}")
     List<CharacterRelationship> selectListByProjectId(@Param("projectId") Long projectId);
+    
+    /**
+     * 根据角色ID列表查询相关的角色关系
+     * @param characterIds 角色ID列表
+     * @return 角色关系列表
+     */
+    @Select("<script>" +
+            "SELECT * FROM character_relationships WHERE " +
+            "source_character_id IN " +
+            "<foreach collection='characterIds' item='id' open='(' separator=',' close=')'>" +
+            "#{id}" +
+            "</foreach>" +
+            " OR target_character_id IN " +
+            "<foreach collection='characterIds' item='id' open='(' separator=',' close=')'>" +
+            "#{id}" +
+            "</foreach>" +
+            "</script>")
+    List<CharacterRelationship> selectListByCharacterIds(@Param("characterIds") List<Long> characterIds);
 } 

@@ -51,7 +51,7 @@ public class ToolService {
         log.info("调用参数: 章节ID={}, 项目ID={}, 角色名称={}, 计划ID={}", chapterId, projectId, name, planId);
 
         LambdaQueryWrapper<Character> queryWrapper = new LambdaQueryWrapper<>();
-        if (name != null && !name.isEmpty()) {
+        if (name == null || name.isEmpty()) {
             return "";
         }
         queryWrapper.eq(Character::getProjectId, Long.parseLong(projectId))
@@ -66,17 +66,14 @@ public class ToolService {
         } else {
             log.warn("测试环境：未找到planId={}对应的PlanContext", planId);
         }
-
         log.info("工具调用：获取角色信息，章节ID: {}, 项目ID: {}, 角色名称: {}, 计划ID: {}", chapterId, projectId, name, planId);
         if (!list.isEmpty()) {
             prompt = characterService.toPrompt(list.get(0));
         }
-
         log.info("工具调用结果: {}", prompt.length() > 100 ? prompt.substring(0, 100) + "..." : prompt);
         log.info("=== 工具调用结束 ===");
         return prompt;
     }
-
 
     @Tool(name = "latest_content_get", description = """
             获取目前小说的最新内容，如果该章节有内容，则返回最新的内容，如果没有内容，则返回上一章节内容。

@@ -68,7 +68,7 @@ public class RagServiceImpl implements RagService {
                           ChapterMapper chapterMapper,
                           CharacterMapper characterMapper,
                           WorldMapper worldMapper
-                          ) {
+    ) {
 
         this.projectMapper = projectMapper;
         this.chapterMapper = chapterMapper;
@@ -77,6 +77,29 @@ public class RagServiceImpl implements RagService {
     }
 
 
+    public void createDocument(String content, Map<String, Object> metadata) {
+        // 使用 TextReader 读取文档
+        TextReader textReader = new TextReader(content);
+        // 设置元数据
+        textReader.getCustomMetadata().put("source", "法国");
+        // 分块文档
+        // 对于文风分析，建议使用更大的分块以保持文本连贯性
+        TokenTextSplitter splitter = new TokenTextSplitter(
+                500,   // 最大令牌数，减小到 50，确保低于 512
+                20,   // 最小令牌数
+                5,    // 块重叠令牌数
+                Integer.MAX_VALUE, // 移除 maxChunks 限制
+                true  // 保留分隔符
+        );
+        List<Document> documents = splitter.apply(textReader.get());
+
+        log.info("分块后的文档数量: {}", documents.size());
+
+        // 存储到向量存储
+        log.info("Adding documents to vector store...");
+        vectorStore.add(documents);
+        log.info("Documents added successfully.");
+    }
 
     @Override
     public void test() {

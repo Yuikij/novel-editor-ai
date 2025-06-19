@@ -82,4 +82,4 @@ spring:
 logging:
   level:
     com.soukon.novelEditorAi.mapper: debug
-    org.springframework.ai: debug
+#    org.springframework.ai: debug

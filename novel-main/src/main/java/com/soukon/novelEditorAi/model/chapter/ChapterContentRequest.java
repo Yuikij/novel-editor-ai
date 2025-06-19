@@ -39,6 +39,11 @@ public class ChapterContentRequest {
      */
     private String chapterContextStr;
 
+    /**
+     * 工具调用结果
+     */
+    private String toolsCallResult;
+
 
     /**
      * 上下文

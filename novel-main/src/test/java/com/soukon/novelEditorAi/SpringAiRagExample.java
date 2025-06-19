@@ -10,7 +10,9 @@ import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @SpringBootTest
 public class SpringAiRagExample {
@@ -22,8 +24,10 @@ public class SpringAiRagExample {
     private VectorStore vectorStore;
 
     @Test
-    void testRag() {
-        SearchRequest request = SearchRequest.builder().topK(2).query("法国首都在哪").build();
+    void searchRag() {
+        SearchRequest request = SearchRequest.builder()
+                .filterExpression("source == 'sample.txt'")
+                .topK(2).query("法国首都在哪").build();
         List<Document> documents = vectorStore.similaritySearch(request);
         System.out.println(documents);
     }
@@ -31,8 +35,13 @@ public class SpringAiRagExample {
 
     @Test
     void delRag() {
-
         vectorStore.delete("source == 'sample.txt'");
+    }
 
+    @Test
+    void addRag() {
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("source", "sample.txt");
+        ragService.createDocument("",metadata);
     }
 }

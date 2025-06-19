@@ -13,8 +13,6 @@ public interface RagService {
     void test();
     void createOrUpdateDocument(String content, String documentId);
 
-
-
 //   根据文档ID和查询文本检索相关文档
     List<Document> retrieveByDocumentId(String documentId, String query);
     /**

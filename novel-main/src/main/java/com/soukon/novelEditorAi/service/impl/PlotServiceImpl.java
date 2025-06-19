@@ -556,4 +556,183 @@ public class PlotServiceImpl extends ServiceImpl<PlotMapper, Plot> implements Pl
         
         return getOne(queryWrapper);
     }
+    
+    @Override
+    public Plot getPreviousPlot(Plot currentPlot) {
+        if (currentPlot == null || currentPlot.getChapterId() == null || currentPlot.getSortOrder() == null) {
+            return null;
+        }
+        
+        return this.baseMapper.selectPreviousPlot(currentPlot.getChapterId(), currentPlot.getSortOrder());
+    }
+    
+    /**
+     * 验证并处理情节的sortOrder，确保在同一章节中不重复
+     * 如果发生重复，会自动调整后续情节的sortOrder
+     *
+     * @param plot 待验证的情节
+     * @param isUpdate 是否为更新操作（true）还是新增操作（false）
+     * @throws IllegalArgumentException 如果参数无效
+     */
+    @Override
+    public void validateAndHandleSortOrder(Plot plot, boolean isUpdate) {
+        if (plot == null) {
+            throw new IllegalArgumentException("情节对象不能为空");
+        }
+        
+        Long chapterId = plot.getChapterId();
+        if (chapterId == null) {
+            throw new IllegalArgumentException("章节ID不能为空");
+        }
+        
+        Integer sortOrder = plot.getSortOrder();
+        
+        // 如果sortOrder为空，自动设置为最后一个情节的下一个序号
+        if (sortOrder == null) {
+            sortOrder = getNextAvailableSortOrder(chapterId);
+            plot.setSortOrder(sortOrder);
+            log.info("自动设置情节排序: 章节ID={}, 新排序={}", chapterId, sortOrder);
+            return;
+        }
+        
+        // 检查sortOrder是否合法（必须大于0）
+        if (sortOrder <= 0) {
+            throw new IllegalArgumentException("情节排序必须大于0，当前值: " + sortOrder);
+        }
+        
+        // 查询是否存在相同sortOrder的情节
+        Plot existingPlot = this.baseMapper.selectByChapterIdAndSortOrder(chapterId, sortOrder);
+        
+        if (existingPlot == null) {
+            // 没有重复，验证通过
+            log.info("验证情节排序通过: 章节ID={}, 情节排序={}", chapterId, sortOrder);
+            return;
+        }
+        
+        if (isUpdate && existingPlot.getId().equals(plot.getId())) {
+            // 更新操作且是同一个情节，无需调整
+            log.info("验证情节排序通过: 章节ID={}, 情节ID={}, 排序={}", chapterId, plot.getId(), sortOrder);
+            return;
+        }
+        
+        // 存在重复，需要调整后续情节的sortOrder
+        log.warn("检测到情节排序重复: 章节ID={}, 重复排序={}, 将调整后续情节排序", chapterId, sortOrder);
+        adjustSubsequentPlotOrders(chapterId, sortOrder, plot.getId());
+        
+        log.info("验证情节排序通过: 章节ID={}, 情节排序={}", chapterId, sortOrder);
+    }
+    
+    /**
+     * 获取章节中下一个可用的sortOrder
+     *
+     * @param chapterId 章节ID
+     * @return 下一个可用的sortOrder
+     */
+    private Integer getNextAvailableSortOrder(Long chapterId) {
+        LambdaQueryWrapper<Plot> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(Plot::getChapterId, chapterId)
+                   .orderByDesc(Plot::getSortOrder)
+                   .last("LIMIT 1");
+        
+        Plot lastPlot = getOne(queryWrapper);
+        return lastPlot != null ? lastPlot.getSortOrder() + 1 : 1;
+    }
+    
+    /**
+     * 调整指定sortOrder及其后续情节的排序，为新情节腾出位置
+     *
+     * @param chapterId 章节ID
+     * @param startSortOrder 开始调整的sortOrder
+     * @param excludePlotId 要排除的情节ID（新增情节时为null，更新情节时为当前情节ID）
+     */
+    private void adjustSubsequentPlotOrders(Long chapterId, Integer startSortOrder, Long excludePlotId) {
+        try {
+            // 查询需要调整的情节（从指定sortOrder开始的所有情节，按sortOrder升序）
+            List<Plot> plotsToAdjust = this.baseMapper.selectByChapterIdAndSortOrderGreaterEqual(
+                chapterId, startSortOrder, excludePlotId);
+            
+            if (plotsToAdjust.isEmpty()) {
+                log.info("没有需要调整排序的情节: 章节ID={}, 起始排序={}", chapterId, startSortOrder);
+                return;
+            }
+            
+            log.info("开始调整情节排序: 章节ID={}, 需要调整的情节数量={}, 起始排序={}", 
+                    chapterId, plotsToAdjust.size(), startSortOrder);
+            
+            // 给每个情节的sortOrder加1，为新情节腾出位置
+            for (Plot plotToAdjust : plotsToAdjust) {
+                Integer newSortOrder = plotToAdjust.getSortOrder() + 1;
+                
+                log.debug("调整情节排序: 情节ID={}, 原排序={}, 新排序={}", 
+                        plotToAdjust.getId(), plotToAdjust.getSortOrder(), newSortOrder);
+                
+                plotToAdjust.setSortOrder(newSortOrder);
+                updateById(plotToAdjust);
+            }
+            
+            log.info("完成情节排序调整: 章节ID={}, 起始排序={}", chapterId, startSortOrder);
+            
+        } catch (Exception e) {
+            log.error("调整情节排序时发生错误: 章节ID={}, 起始排序={}, 错误: {}", 
+                    chapterId, startSortOrder, e.getMessage(), e);
+            throw new RuntimeException("调整情节排序失败", e);
+        }
+    }
+    
+    /**
+     * 重新整理章节中所有情节的sortOrder，确保连续且无重复
+     * 此方法用于数据修复，通常不在业务流程中使用
+     *
+     * @param chapterId 章节ID
+     */
+    public void reorderPlotsInChapter(Long chapterId) {
+        if (chapterId == null) {
+            throw new IllegalArgumentException("章节ID不能为空");
+        }
+        
+        try {
+            log.info("开始重新整理情节排序: 章节ID={}", chapterId);
+            
+            // 查询章节所有情节，按当前sortOrder排序
+            LambdaQueryWrapper<Plot> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(Plot::getChapterId, chapterId)
+                       .orderByAsc(Plot::getSortOrder);
+            
+            List<Plot> allPlots = list(queryWrapper);
+            
+            if (allPlots.isEmpty()) {
+                log.info("章节中没有情节需要重新排序: 章节ID={}", chapterId);
+                return;
+            }
+            
+            log.info("开始重新分配情节排序: 章节ID={}, 情节数量={}", chapterId, allPlots.size());
+            
+            // 重新分配sortOrder，从1开始连续递增
+            boolean hasChanges = false;
+            for (int i = 0; i < allPlots.size(); i++) {
+                Plot plot = allPlots.get(i);
+                Integer newSortOrder = i + 1;
+                
+                // 只有当sortOrder发生变化时才更新
+                if (!newSortOrder.equals(plot.getSortOrder())) {
+                    log.debug("更新情节排序: 情节ID={}, 原排序={}, 新排序={}", 
+                            plot.getId(), plot.getSortOrder(), newSortOrder);
+                    
+                    plot.setSortOrder(newSortOrder);
+                    updateById(plot);
+                    hasChanges = true;
+                }
+            }
+            
+            if (hasChanges) {
+                log.info("完成情节排序重新整理: 章节ID={}, 已调整情节排序", chapterId);
+            } else {
+                log.info("情节排序无需调整: 章节ID={}", chapterId);
+            }
+            
+        } catch (Exception e) {
+            log.error("重新整理情节排序时发生错误: 章节ID={}, 错误: {}", chapterId, e.getMessage(), e);
+            throw new RuntimeException("重新整理情节排序失败", e);
+        }
+    }
 } 

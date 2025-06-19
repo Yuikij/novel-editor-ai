@@ -37,6 +37,11 @@ public class ChapterContext {
      * 当前章节信息
      */
     private Chapter currentChapter;
+
+    /**
+     * 需要写作的情节
+     */
+    private Plot firstIncompletePlot;
     
     /**
      * 前一章节（如果有）

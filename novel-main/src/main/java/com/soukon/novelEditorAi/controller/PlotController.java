@@ -82,45 +82,50 @@ public class PlotController {
 
     @PostMapping
     public Result<Plot> save(@RequestBody Plot plot) {
-        LocalDateTime now = LocalDateTime.now();
-        plot.setCreatedAt(now);
-        plot.setUpdatedAt(now);
-        
-        // If plotOrder is not set, find the max order and set to order+1
-        if (plot.getSortOrder() == null) {
-            LambdaQueryWrapper<Plot> queryWrapper = new LambdaQueryWrapper<>();
-            queryWrapper.eq(Plot::getProjectId, plot.getProjectId());
-            if (plot.getChapterId() != null) {
-                queryWrapper.eq(Plot::getChapterId, plot.getChapterId());
-            }
-            queryWrapper.orderByDesc(Plot::getSortOrder);
-            queryWrapper.last("LIMIT 1");
+        try {
+            LocalDateTime now = LocalDateTime.now();
+            plot.setCreatedAt(now);
+            plot.setUpdatedAt(now);
             
-            Plot lastPlot = plotService.getOne(queryWrapper);
-            if (lastPlot != null) {
-                plot.setSortOrder(lastPlot.getSortOrder() + 1);
-            } else {
-                plot.setSortOrder(1);
-            }
+            // 验证并处理sortOrder的唯一性
+            plotService.validateAndHandleSortOrder(plot, false);
+            
+            plotService.save(plot);
+            return Result.success("Plot created successfully", plot);
+        } catch (IllegalArgumentException e) {
+            log.error("创建情节时参数错误: {}", e.getMessage());
+            return Result.error("参数错误: " + e.getMessage());
+        } catch (Exception e) {
+            log.error("创建情节时发生错误: {}", e.getMessage(), e);
+            return Result.error("创建情节失败: " + e.getMessage());
         }
-        
-        plotService.save(plot);
-        return Result.success("Plot created successfully", plot);
     }
 
     @PutMapping("/{id}")
     public Result<Plot> update(@PathVariable("id") Long id, @RequestBody Plot plot) {
-        Plot existingPlot = plotService.getById(id);
-        if (existingPlot == null) {
-            return Result.error("Plot not found with id: " + id);
+        try {
+            Plot existingPlot = plotService.getById(id);
+            if (existingPlot == null) {
+                return Result.error("Plot not found with id: " + id);
+            }
+            
+            plot.setId(id);
+            plot.setCreatedAt(existingPlot.getCreatedAt());
+            plot.setUpdatedAt(LocalDateTime.now());
+            
+            // 验证并处理sortOrder的唯一性
+            plotService.validateAndHandleSortOrder(plot, true);
+            
+            plotService.updateById(plot);
+            
+            return Result.success("Plot updated successfully", plot);
+        } catch (IllegalArgumentException e) {
+            log.error("更新情节时参数错误: {}", e.getMessage());
+            return Result.error("参数错误: " + e.getMessage());
+        } catch (Exception e) {
+            log.error("更新情节时发生错误: {}", e.getMessage(), e);
+            return Result.error("更新情节失败: " + e.getMessage());
         }
-        
-        plot.setId(id);
-        plot.setCreatedAt(existingPlot.getCreatedAt());
-        plot.setUpdatedAt(LocalDateTime.now());
-        plotService.updateById(plot);
-        
-        return Result.success("Plot updated successfully", plot);
     }
 
     @DeleteMapping("/{id}")
@@ -199,6 +204,33 @@ public class PlotController {
         } catch (Exception e) {
             log.error("情节扩展失败: {}", e.getMessage(), e);
             return Result.error("情节扩展失败: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 重新整理章节中所有情节的排序，确保连续且无重复
+     * 此接口用于数据修复
+     * 
+     * @param chapterId 章节ID
+     * @return 操作结果
+     */
+    @PostMapping("/reorder-chapter/{chapterId}")
+    public Result<Void> reorderPlotsInChapter(@PathVariable("chapterId") Long chapterId) {
+        try {
+            if (chapterId == null) {
+                return Result.error("章节ID不能为空");
+            }
+            
+            // 调用PlotServiceImpl中的public方法来重新整理排序
+            ((com.soukon.novelEditorAi.service.impl.PlotServiceImpl) plotService).reorderPlotsInChapter(chapterId);
+            
+            return Result.success("情节排序重新整理成功", null);
+        } catch (IllegalArgumentException e) {
+            log.error("重新整理情节排序时参数错误: {}", e.getMessage());
+            return Result.error("参数错误: " + e.getMessage());
+        } catch (Exception e) {
+            log.error("重新整理情节排序时发生错误: {}", e.getMessage(), e);
+            return Result.error("重新整理情节排序失败: " + e.getMessage());
         }
     }
 }

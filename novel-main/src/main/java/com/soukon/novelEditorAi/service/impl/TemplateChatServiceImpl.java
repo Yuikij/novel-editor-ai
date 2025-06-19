@@ -61,19 +61,19 @@ public class TemplateChatServiceImpl implements TemplateChatService {
     private final ConcurrentHashMap<String, String> conversationContexts = new ConcurrentHashMap<>();
 
     @Autowired
-    public TemplateChatServiceImpl(@Qualifier("openAiChatModel")ChatModel chatModel) {
+    public TemplateChatServiceImpl(@Qualifier("openAiChatModel") ChatModel chatModel) {
         MessageWindowChatMemory memory = MessageWindowChatMemory.builder()
                 .maxMessages(10)
                 .build();
-                
+
         this.chatClient = ChatClient.builder(chatModel)
                 .defaultAdvisors(
-                        MessageChatMemoryAdvisor.builder(memory).build(),
+//                        MessageChatMemoryAdvisor.builder(memory).build(),
                         new SimpleLoggerAdvisor()
                 )
                 .defaultOptions(
                         OpenAiChatOptions.builder()
-                                .maxTokens(maxTokens)
+//                                .maxTokens(maxTokens)
                                 .temperature(temperature)
                                 .build()
                 )
@@ -99,7 +99,7 @@ public class TemplateChatServiceImpl implements TemplateChatService {
             LambdaQueryWrapper<Template> wrapper = new LambdaQueryWrapper<>();
             QueryUtils.fillSelect(wrapper, Template.class, TemplateChatContextVO.class);
             wrapper.eq(Template::getId, request.getTemplateId());
-            
+
             Template template = templateMapper.selectOne(wrapper);
 
             // 检索相关文档
@@ -112,8 +112,8 @@ public class TemplateChatServiceImpl implements TemplateChatService {
             String systemPrompt = buildSystemPrompt(template, context);
 
             // 生成对话ID（如果没有提供）
-            String conversationId = StringUtils.hasText(request.getConversationId()) 
-                    ? request.getConversationId() 
+            String conversationId = StringUtils.hasText(request.getConversationId())
+                    ? request.getConversationId()
                     : "template-" + request.getTemplateId() + "-" + System.currentTimeMillis();
 
             // 进行对话
@@ -134,63 +134,66 @@ public class TemplateChatServiceImpl implements TemplateChatService {
 
     @Override
     public Flux<String> chatWithTemplateStream(TemplateChatRequest request) {
-        return Flux.create(sink -> {
-            try {
-                // 验证请求参数
-                Result<Boolean> validationResult = validateChatRequest(request);
-                if (validationResult.getCode() != 200) {
-                    sink.error(new RuntimeException(validationResult.getMessage()));
-                    return;
-                }
-
-                // 检查模板是否可以对话
-                Result<Boolean> canChatResult = canChatWithTemplate(request.getTemplateId());
-                if (canChatResult.getCode() != 200 || !canChatResult.getData()) {
-                    sink.error(new RuntimeException("模板尚未完成向量化，无法进行对话"));
-                    return;
-                }
-
-                // 获取模板信息
-                LambdaQueryWrapper<Template> wrapper = new LambdaQueryWrapper<>();
-                QueryUtils.fillSelect(wrapper, Template.class, TemplateChatContextVO.class);
-                wrapper.eq(Template::getId, request.getTemplateId());
-                
-                Template template = templateMapper.selectOne(wrapper);
-
-                // 检索相关文档
-                List<Document> relevantDocs = retrieveRelevantDocuments(request);
-
-                // 构建上下文
-                String context = buildContext(template, relevantDocs);
-
-                // 构建系统提示词
-                String systemPrompt = buildSystemPrompt(template, context);
-
-                // 生成对话ID（如果没有提供）
-                String conversationId = StringUtils.hasText(request.getConversationId()) 
-                        ? request.getConversationId() 
-                        : "template-" + request.getTemplateId() + "-" + System.currentTimeMillis();
-
-                // 进行流式对话
-                Flux<String> responseFlux = chatClient.prompt()
-                        .system(systemPrompt)
-                        .user(request.getMessage())
-                        .stream()
-                        .content();
-
-                responseFlux.subscribe(
-                        sink::next,
-                        sink::error,
-                        sink::complete
-                );
-
-                log.info("模板 {} 流式对话开始，对话ID: {}", request.getTemplateId(), conversationId);
-
-            } catch (Exception e) {
-                log.error("模板流式对话失败: {}", e.getMessage(), e);
-                sink.error(e);
+//        return Flux.create(sink -> {
+        try {
+            // 验证请求参数
+            Result<Boolean> validationResult = validateChatRequest(request);
+            if (validationResult.getCode() != 200) {
+//                    sink.error(new RuntimeException(validationResult.getMessage()));
+                return Flux.error(new RuntimeException(validationResult.getMessage()));
             }
-        });
+
+            // 检查模板是否可以对话
+            Result<Boolean> canChatResult = canChatWithTemplate(request.getTemplateId());
+            if (canChatResult.getCode() != 200 || !canChatResult.getData()) {
+//                    sink.error(new RuntimeException("模板尚未完成向量化，无法进行对话"));
+                return Flux.error(new RuntimeException("模板尚未完成向量化，无法进行对话"));
+            }
+
+            // 获取模板信息
+            LambdaQueryWrapper<Template> wrapper = new LambdaQueryWrapper<>();
+            QueryUtils.fillSelect(wrapper, Template.class, TemplateChatContextVO.class);
+            wrapper.eq(Template::getId, request.getTemplateId());
+
+            Template template = templateMapper.selectOne(wrapper);
+
+            // 检索相关文档
+            List<Document> relevantDocs = retrieveRelevantDocuments(request);
+
+            // 构建上下文
+            String context = buildContext(template, relevantDocs);
+
+            // 构建系统提示词
+            String systemPrompt = buildSystemPrompt(template, context);
+
+            // 生成对话ID（如果没有提供）
+            String conversationId = StringUtils.hasText(request.getConversationId())
+                    ? request.getConversationId()
+                    : "template-" + request.getTemplateId() + "-" + System.currentTimeMillis();
+
+            // 进行流式对话
+            Flux<String> responseFlux = chatClient.prompt()
+                    .system(systemPrompt)
+                    .user(request.getMessage())
+                    .stream()
+                    .content();
+            log.info("模板 {} 流式对话开始，对话ID: {}", request.getTemplateId(), conversationId);
+
+            return responseFlux;
+
+//                responseFlux.subscribe(
+//                        sink::next,
+//                        sink::error,
+//                        sink::complete
+//                );
+
+
+        } catch (Exception e) {
+            log.error("模板流式对话失败: {}", e.getMessage(), e);
+//                sink.error(e);
+        }
+//        });
+        return Flux.error(new RuntimeException("流式对话功能未实现"));
     }
 
     @Override
@@ -200,7 +203,7 @@ public class TemplateChatServiceImpl implements TemplateChatService {
             LambdaQueryWrapper<Template> wrapper = new LambdaQueryWrapper<>();
             QueryUtils.fillSelect(wrapper, Template.class, TemplateChatContextVO.class);
             wrapper.eq(Template::getId, templateId);
-            
+
             Template template = templateMapper.selectOne(wrapper);
             if (template == null) {
                 return Result.error("模板不存在");
@@ -244,7 +247,7 @@ public class TemplateChatServiceImpl implements TemplateChatService {
 
             // 尝试多种过滤策略，按成功率排序
             String[] filterStrategies = {
-                "type == 'template' && templateId == '" + request.getTemplateId() + "'",
+                    "type == 'template' && templateId == '" + request.getTemplateId() + "'",
             };
 
             List<Document> documents = null;
@@ -280,7 +283,7 @@ public class TemplateChatServiceImpl implements TemplateChatService {
             // 如果所有过滤策略都失败，尝试无过滤器搜索并手动筛选
             if (documents == null || documents.isEmpty()) {
                 log.warn("所有过滤策略都失败，尝试无过滤器搜索");
-                
+
                 try {
                     SearchRequest noFilterRequest = SearchRequest.builder()
                             .query(request.getMessage())
@@ -289,7 +292,7 @@ public class TemplateChatServiceImpl implements TemplateChatService {
                             .build();
 
                     List<Document> allDocuments = vectorStore.similaritySearch(noFilterRequest);
-                    
+
                     // 手动筛选属于该模板的文档
                     documents = allDocuments.stream()
                             .filter(doc -> {
@@ -298,16 +301,16 @@ public class TemplateChatServiceImpl implements TemplateChatService {
                                     return templateIdObj.toString().equals(request.getTemplateId().toString());
                                 }
                                 // 也检查文档ID
-                                return doc.getId() != null && 
+                                return doc.getId() != null &&
                                        doc.getId().startsWith("template-" + request.getTemplateId() + "-");
                             })
                             .limit(maxResults)
                             .toList();
-                    
+
                     if (!documents.isEmpty()) {
                         log.info("通过手动筛选找到 {} 个相关文档", documents.size());
                     }
-                    
+
                 } catch (Exception e) {
                     log.error("无过滤器搜索也失败: {}", e.getMessage());
                     documents = List.of();
@@ -319,7 +322,7 @@ public class TemplateChatServiceImpl implements TemplateChatService {
                 // 启动调试模式
                 VectorStoreDebugUtil.debugTemplateDocuments(vectorStore, request.getTemplateId());
             } else {
-                log.info("为模板 {} 检索到 {} 个相关文档，使用过滤条件: {}", 
+                log.info("为模板 {} 检索到 {} 个相关文档，使用过滤条件: {}",
                         request.getTemplateId(), documents.size(), successfulFilter);
             }
 

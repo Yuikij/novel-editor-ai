@@ -21,4 +21,18 @@ public interface CharacterMapper extends BaseMapper<Character> {
      */
     @Select("SELECT * FROM characters WHERE project_id = #{projectId} ORDER BY id")
     List<Character> selectListByProjectId(@Param("projectId") Long projectId);
+    
+    /**
+     * 根据角色ID列表查询角色
+     * @param characterIds 角色ID列表
+     * @return 角色列表
+     */
+    @Select("<script>" +
+            "SELECT * FROM characters WHERE id IN " +
+            "<foreach collection='characterIds' item='id' open='(' separator=',' close=')'>" +
+            "#{id}" +
+            "</foreach>" +
+            " ORDER BY id" +
+            "</script>")
+    List<Character> selectListByIds(@Param("characterIds") List<Long> characterIds);
 } 

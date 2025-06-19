@@ -25,4 +25,11 @@ public interface CharacterRelationshipService extends IService<CharacterRelation
      * 根据项目ID获取角色关系列表
      */
     List<CharacterRelationship> getByProjectId(Long projectId);
+    
+    /**
+     * 根据角色ID列表获取相关的角色关系列表
+     * @param characterIds 角色ID列表
+     * @return 角色关系列表
+     */
+    List<CharacterRelationship> getByCharacterIds(List<Long> characterIds);
 } 

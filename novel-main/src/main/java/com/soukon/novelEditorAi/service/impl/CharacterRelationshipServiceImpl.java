@@ -81,4 +81,12 @@ public class CharacterRelationshipServiceImpl extends ServiceImpl<CharacterRelat
     public List<CharacterRelationship> getByProjectId(Long projectId) {
         return this.baseMapper.selectListByProjectId(projectId);
     }
+
+    @Override
+    public List<CharacterRelationship> getByCharacterIds(List<Long> characterIds) {
+        if (characterIds == null || characterIds.isEmpty()) {
+            return List.of();
+        }
+        return this.baseMapper.selectListByCharacterIds(characterIds);
+    }
 } 
