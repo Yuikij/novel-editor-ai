@@ -36,8 +36,7 @@ public class SpringAiRagExample {
     @Test
     void searchRagById() {
         SearchRequest request = SearchRequest.builder()
-
-                .filterExpression("id == 'doc-1750351730499-chunk-0'")
+                .filterExpression("id == 'doc-1750351730499'")
                 .topK(2).query("法国首都在哪").build();
         List<Document> documents = vectorStore.similaritySearch(request);
         System.out.println(documents);

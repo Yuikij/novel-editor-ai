@@ -539,7 +539,7 @@ public class PlotServiceImpl extends ServiceImpl<PlotMapper, Plot> implements Pl
      * 获取章节中第一个未完成的情节（完成度不是100%）
      *
      * @param chapterId 章节ID
-     * @return 第一个未完成的情节，如果所有情节都已完成或没有情节则返回null
+     * @return 第一个未完成的情节，如果所有情节都已完成或没有情节则返回最后一个情节
      */
     @Override
     public Plot getFirstIncompletePlot(Long chapterId) {
@@ -554,7 +554,19 @@ public class PlotServiceImpl extends ServiceImpl<PlotMapper, Plot> implements Pl
                     .orderByAsc(Plot::getSortOrder)
                     .last("LIMIT 1");
         
-        return getOne(queryWrapper);
+        Plot incompletePlot = getOne(queryWrapper);
+        
+        // 如果找不到未完成的情节，返回最后一个情节
+        if (incompletePlot == null) {
+            LambdaQueryWrapper<Plot> lastPlotWrapper = new LambdaQueryWrapper<>();
+            lastPlotWrapper.eq(Plot::getChapterId, chapterId)
+                          .orderByDesc(Plot::getSortOrder)
+                          .last("LIMIT 1");
+            
+            return getOne(lastPlotWrapper);
+        }
+        
+        return incompletePlot;
     }
     
     @Override
@@ -734,5 +746,14 @@ public class PlotServiceImpl extends ServiceImpl<PlotMapper, Plot> implements Pl
             log.error("重新整理情节排序时发生错误: 章节ID={}, 错误: {}", chapterId, e.getMessage(), e);
             throw new RuntimeException("重新整理情节排序失败", e);
         }
+    }
+    
+    @Override
+    public Plot getByChapterIdAndSortOrder(Long chapterId, Integer sortOrder) {
+        if (chapterId == null || sortOrder == null) {
+            return null;
+        }
+        
+        return this.baseMapper.selectByChapterIdAndSortOrder(chapterId, sortOrder);
     }
 } 

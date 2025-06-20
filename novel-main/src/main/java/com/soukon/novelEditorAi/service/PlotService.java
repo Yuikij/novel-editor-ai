@@ -62,4 +62,13 @@ public interface PlotService extends IService<Plot> {
      * @throws IllegalArgumentException 如果参数无效
      */
     void validateAndHandleSortOrder(Plot plot, boolean isUpdate);
+    
+    /**
+     * 根据章节ID和排序查找情节
+     *
+     * @param chapterId 章节ID
+     * @param sortOrder 排序值
+     * @return 匹配的情节，如果没有则返回null
+     */
+    Plot getByChapterIdAndSortOrder(Long chapterId, Integer sortOrder);
 } 

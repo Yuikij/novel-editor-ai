@@ -176,6 +176,33 @@ public class PlotController {
     }
     
     /**
+     * 根据章节ID和排序查找情节
+     * 
+     * @param chapterId 章节ID
+     * @param sortOrder 排序值
+     * @return 匹配的情节，如果没有则返回null
+     */
+    @GetMapping("/chapter/{chapterId}/sort-order/{sortOrder}")
+    public Result<Plot> getByChapterIdAndSortOrder(
+            @PathVariable("chapterId") Long chapterId,
+            @PathVariable("sortOrder") Integer sortOrder) {
+        
+        if (chapterId == null) {
+            return Result.error("Chapter ID is required");
+        }
+        if (sortOrder == null) {
+            return Result.error("Sort order is required");
+        }
+        
+        Plot plot = plotService.getByChapterIdAndSortOrder(chapterId, sortOrder);
+        if (plot != null) {
+            return Result.success(plot);
+        } else {
+            return Result.success("Plot not found with the specified chapter ID and sort order", null);
+        }
+    }
+    
+    /**
      * 自动补全或扩展情节列表到目标数量
      * 
      * @param chapterId 章节ID
