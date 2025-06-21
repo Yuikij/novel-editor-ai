@@ -29,8 +29,10 @@ import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.List;
 
 @Service
 public class LlmService {
@@ -177,6 +179,48 @@ public class LlmService {
 
     public ChatModel getChatModel() {
         return chatModel;
+    }
+
+    /**
+     * 流式对话方法
+     * @param systemPrompt 系统提示词
+     * @param conversationHistory 对话历史
+     * @param userMessage 用户消息
+     * @param temperature 温度参数
+     * @param maxTokens 最大token数
+     * @return 流式响应
+     */
+    public Flux<String> streamChat(String systemPrompt, List<String> conversationHistory, 
+                                   String userMessage, Float temperature, Integer maxTokens) {
+        try {
+            // 构建对话上下文
+            StringBuilder contextBuilder = new StringBuilder();
+            if (conversationHistory != null && !conversationHistory.isEmpty()) {
+                for (String historyMessage : conversationHistory) {
+                    contextBuilder.append(historyMessage).append("\n");
+                }
+            }
+            contextBuilder.append("用户: ").append(userMessage);
+            
+            // 创建临时的ChatClient用于流式对话
+            ChatClient streamChatClient = ChatClient.builder(chatModel)
+                    .defaultSystem(systemPrompt)
+                    .defaultOptions(OpenAiChatOptions.builder()
+                            .temperature(temperature != null ? temperature.doubleValue() : 0.8)
+                            .maxTokens(maxTokens != null ? maxTokens : 2000)
+                            .build())
+                    .build();
+            
+            // 执行流式调用
+            return streamChatClient.prompt()
+                    .user(contextBuilder.toString())
+                    .stream()
+                    .content();
+                    
+        } catch (Exception e) {
+            log.error("流式对话失败", e);
+            return Flux.error(e);
+        }
     }
 
 }

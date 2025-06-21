@@ -34,6 +34,9 @@ public class ChapterController {
 
     @Autowired
     private ChapterService chapterService;
+    
+    @Autowired
+    private com.soukon.novelEditorAi.service.EntitySyncHelper entitySyncHelper;
 
     private final ChapterContentService chapterContentService;
 
@@ -188,11 +191,21 @@ public class ChapterController {
             LocalDateTime now = LocalDateTime.now();
             chapter.setCreatedAt(now);
             chapter.setUpdatedAt(now);
+            
+            // 初始化向量版本号
+            if (chapter.getVectorVersion() == null) {
+                chapter.setVectorVersion(1L);
+            }
 
             // 验证并处理sortOrder重复问题
             chapterService.validateAndHandleSortOrder(chapter, false);
 
             chapterService.save(chapter);
+            
+            // 触发向量同步（异步）
+            entitySyncHelper.triggerCreate("chapter", chapter.getId(), 
+                chapter.getProjectId(), false);
+            
             return Result.success("Chapter created successfully", chapter);
         } catch (IllegalArgumentException e) {
             log.error("章节创建参数错误: {}", e.getMessage());
@@ -216,6 +229,10 @@ public class ChapterController {
             if (chapter.getProjectId() == null) {
                 chapter.setProjectId(existingChapter.getProjectId());
             }
+            
+            // 递增向量版本号
+            Long currentVersion = existingChapter.getVectorVersion();
+            chapter.setVectorVersion(currentVersion != null ? currentVersion + 1 : 1L);
 
             // 验证并处理sortOrder重复问题
             chapterService.validateAndHandleSortOrder(chapter, true);
@@ -244,7 +261,22 @@ public class ChapterController {
             chapter.setHistoryContent(historyContent);
             chapter.setCreatedAt(existingChapter.getCreatedAt());
             chapter.setUpdatedAt(LocalDateTime.now());
+            
+            // 检查内容是否真的发生了变更
+            String oldContent = existingChapter.getContent();
+            String newContent = chapter.getContent();
+            boolean contentChanged = entitySyncHelper.isContentChanged(oldContent, newContent);
+            
             chapterService.updateById(chapter);
+            
+            // 只在内容真正变更时才触发向量同步
+            if (contentChanged) {
+                entitySyncHelper.triggerUpdate("chapter", chapter.getId(), 
+                    chapter.getVectorVersion(), chapter.getProjectId(), false);
+                log.info("章节内容已变更，触发向量同步: {}", chapter.getId());
+            } else {
+                log.debug("章节内容未变更，跳过向量同步: {}", chapter.getId());
+            }
 
             return Result.success("Chapter updated successfully", chapter);
         } catch (IllegalArgumentException e) {
@@ -264,6 +296,11 @@ public class ChapterController {
         }
 
         chapterService.removeById(id);
+        
+        // 触发向量同步删除（紧急处理）
+        entitySyncHelper.triggerDelete("chapter", id, chapter.getProjectId(), true);
+        log.info("章节已删除，触发向量同步删除: {}", id);
+        
         return Result.success("Chapter deleted successfully", null);
     }
 
@@ -279,7 +316,18 @@ public class ChapterController {
             return Result.error("IDs list cannot be empty");
         }
 
+        // 获取要删除的章节信息（用于向量同步）
+        List<Chapter> chaptersToDelete = chapterService.listByIds(ids);
+        
         chapterService.removeByIds(ids);
+        
+        // 批量触发向量同步删除
+        for (Chapter chapter : chaptersToDelete) {
+            entitySyncHelper.triggerDelete("chapter", chapter.getId(), 
+                chapter.getProjectId(), false); // 批量删除使用异步
+        }
+        log.info("批量删除章节完成，触发了{}个向量同步删除任务", chaptersToDelete.size());
+        
         return Result.success("批量删除成功", null);
     }
 

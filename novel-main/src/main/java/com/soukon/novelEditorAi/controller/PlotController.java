@@ -19,6 +19,9 @@ public class PlotController {
 
     @Autowired
     private PlotService plotService;
+    
+    @Autowired
+    private com.soukon.novelEditorAi.service.EntitySyncHelper entitySyncHelper;
 
     @GetMapping
     public Result<List<Plot>> list() {
@@ -87,10 +90,20 @@ public class PlotController {
             plot.setCreatedAt(now);
             plot.setUpdatedAt(now);
             
+            // 初始化向量版本号
+            if (plot.getVectorVersion() == null) {
+                plot.setVectorVersion(1L);
+            }
+            
             // 验证并处理sortOrder的唯一性
             plotService.validateAndHandleSortOrder(plot, false);
             
             plotService.save(plot);
+            
+            // 触发向量同步（异步）
+            entitySyncHelper.triggerCreate("plot", plot.getId(), 
+                plot.getProjectId(), false);
+            
             return Result.success("Plot created successfully", plot);
         } catch (IllegalArgumentException e) {
             log.error("创建情节时参数错误: {}", e.getMessage());

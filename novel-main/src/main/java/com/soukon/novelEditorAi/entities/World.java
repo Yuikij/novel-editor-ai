@@ -27,6 +27,14 @@ public class World {
     private List<Element> elements;
     
     private String notes;
+    
+    // 向量化相关字段
+    private String vectorStatus;
+    private Long vectorVersion;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime vectorLastSync;
+    private String vectorErrorMessage;
+    
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdAt;
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")

@@ -1,0 +1,31 @@
+# 向量同步相关配置
+novel:
+  vector:
+    # 文本分片配置
+    chunk-size: 500
+    chunk-overlap: 100
+    
+    # 同步任务配置
+    batch-size: 50
+    max-retries: 3
+    task-timeout-hours: 2
+    
+    # 是否启用向量同步
+    enabled: true
+    
+    # 是否在启动时执行数据一致性检查
+    check-consistency-on-startup: false
+    
+    # 异步处理配置
+    async:
+      core-pool-size: 5
+      max-pool-size: 20
+      queue-capacity: 100
+      thread-name-prefix: "vector-sync-"
+      
+# 日志配置
+logging:
+  level:
+    com.soukon.novelEditorAi.service.impl.UnifiedVectorSyncServiceImpl: INFO
+    com.soukon.novelEditorAi.service.VectorSyncScheduleService: INFO
+    com.soukon.novelEditorAi.service.impl.ConsistentVectorSearchServiceImpl: DEBUG 

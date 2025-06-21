@@ -31,6 +31,14 @@ public class Chapter {
     private JSONObject historyContent; // 章节历史内容
     //  类型结构
     private String type;
+    
+    // 向量化相关字段
+    private String vectorStatus;
+    private Long vectorVersion;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime vectorLastSync;
+    private String vectorErrorMessage;
+    
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdAt; // 创建时间
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")

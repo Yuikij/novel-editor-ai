@@ -7,11 +7,14 @@ import com.soukon.novelEditorAi.service.ChapterContentService;
 import com.soukon.novelEditorAi.service.ChapterService;
 import com.soukon.novelEditorAi.service.CharacterService;
 import com.soukon.novelEditorAi.service.RagService;
+import com.soukon.novelEditorAi.service.ConsistentVectorSearchService;
 import com.soukon.novelEditorAi.service.impl.ChapterContentServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -38,6 +41,14 @@ public class ToolService {
 
     @Autowired
     private RagService ragService;
+
+
+    @Autowired
+    private VectorStore vectorStore;
+
+    @Autowired
+    private ConsistentVectorSearchService consistentVectorSearchService;
+
 
     @Tool(name = "get_character_info", description = """
             根据角色名称获取角色相关信息。
@@ -103,14 +114,14 @@ public class ToolService {
 
 
     @Tool(name = "rag_query", description = """
-            检索相关信息，包括相关章节、角色、世界观等背景信息
+            通过关键字或者提问句，检索任何小说中的相关信息，包括章节、角色、世界观，小说内容等信息
             """)
-    public String ragQuery(@ToolParam(description = "章节id") String chapterId,
+    public String ragQuery(@ToolParam(description = "章节id") String projectId,
                            @ToolParam(description = "想要查询的内容关键词") String query,
                            @ToolParam(description = "计划id") String planId) {
         log.info("=== 工具调用开始 ===");
         log.info("工具名称: rag_query");
-        log.info("调用参数: 章节ID={}, 查询内容={}, 计划ID={}", chapterId, query, planId);
+        log.info("调用参数: 章节ID={}, 查询内容={}, 计划ID={}", projectId, query, planId);
 
         // 安全地获取PlanContext，避免测试环境中的null错误
         PlanContext planContext = chapterContentService.getPlanContextMap().get(planId);
@@ -121,56 +132,28 @@ public class ToolService {
         }
 
         try {
-            // 使用RAG服务检索相关信息
-            List<Document> relevantDocs = ragService.retrieveRelevantForChapter(Long.parseLong(chapterId), 5);
-            
+            // 使用一致性RAG服务检索相关信息
+            SearchRequest request = SearchRequest.builder()
+                    .filterExpression("projectId == '" + projectId + "'")
+                    .topK(8).query(query).build();
+            List<Document> relevantDocs = consistentVectorSearchService.searchWithConsistency(request, Long.parseLong(projectId));
             if (relevantDocs == null || relevantDocs.isEmpty()) {
-                log.info("没有找到与章节 {} 相关的文档", chapterId);
+                log.info("没有找到与项目 {} 相关的文档", projectId);
                 return "未找到相关背景信息";
             }
-
             // 格式化检索结果
             StringBuilder result = new StringBuilder();
             result.append("检索到的相关信息：\n\n");
-            
             for (int i = 0; i < relevantDocs.size(); i++) {
                 Document doc = relevantDocs.get(i);
-                String docType = doc.getMetadata().getOrDefault("type", "unknown").toString();
-                
-                result.append(i + 1).append(". ");
-                switch (docType) {
-                    case "chapter":
-                        result.append("相关章节「")
-                                .append(doc.getMetadata().getOrDefault("title", ""))
-                                .append("」:\n");
-                        break;
-                    case "character":
-                        result.append("角色信息「")
-                                .append(doc.getMetadata().getOrDefault("name", ""))
-                                .append("」:\n");
-                        break;
-                    case "world":
-                        result.append("世界观「")
-                                .append(doc.getMetadata().getOrDefault("name", ""))
-                                .append("」:\n");
-                        break;
-                    default:
-                        result.append("相关信息:\n");
-                }
-                
-                // 添加文档内容，限制长度
                 String content = doc.getText();
-                if (content.length() > 300) {
-                    content = content.substring(0, 300) + "...";
-                }
+                result.append(i + 1).append(". ").append("\n");
                 result.append(content).append("\n\n");
             }
-
             String finalResult = result.toString();
             log.info("RAG查询结果: {}", finalResult.length() > 100 ? finalResult.substring(0, 100) + "..." : finalResult);
             log.info("=== 工具调用结束 ===");
             return finalResult;
-            
         } catch (Exception e) {
             log.error("RAG查询失败: {}", e.getMessage(), e);
             log.info("=== 工具调用结束（失败）===");

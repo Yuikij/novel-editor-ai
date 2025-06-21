@@ -42,17 +42,19 @@ public class ChapterServiceImpl extends ServiceImpl<ChapterMapper, Chapter> impl
     private final CharacterService characterService;
     private final CharacterRelationshipService characterRelationshipService;
     private final OutlinePlotPointService outlinePlotPointService;
+    private final EntitySyncHelper entitySyncHelper;
 
     @Autowired
     public ChapterServiceImpl(ChapterMapper chapterMapper, ProjectService projectService,@Qualifier("openAiChatModel") ChatModel openAiChatModel,
                               CharacterService characterService,CharacterRelationshipService characterRelationshipService,
-                              @Lazy OutlinePlotPointService outlinePlotPointService
+                              @Lazy OutlinePlotPointService outlinePlotPointService, EntitySyncHelper entitySyncHelper
     ) {
         this.chapterMapper = chapterMapper;
         this.projectService = projectService;
         this.characterService = characterService;
         this.outlinePlotPointService = outlinePlotPointService;
         this.characterRelationshipService = characterRelationshipService;
+        this.entitySyncHelper = entitySyncHelper;
         this.chatClient = ChatClient.builder(openAiChatModel)
                 .defaultAdvisors(new SimpleLoggerAdvisor())
                 .defaultOptions(

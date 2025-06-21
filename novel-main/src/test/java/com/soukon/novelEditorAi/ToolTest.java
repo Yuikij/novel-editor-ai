@@ -123,4 +123,13 @@ public class ToolTest {
 
 
     }
+
+    @Test
+    void testRag() {
+
+        String characterInfo = toolService.ragQuery("1916681854987075585","小兰是谁","123");
+        System.out.println(characterInfo);
+
+
+    }
 }

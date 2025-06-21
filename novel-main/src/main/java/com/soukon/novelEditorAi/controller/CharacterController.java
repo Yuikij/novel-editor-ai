@@ -22,6 +22,9 @@ public class CharacterController {
 
     @Autowired
     private CharacterRelationshipService characterRelationshipService;
+    
+    @Autowired
+    private com.soukon.novelEditorAi.service.EntitySyncHelper entitySyncHelper;
 
     @GetMapping
     public Result<List<Character>> list() {
@@ -84,7 +87,14 @@ public class CharacterController {
         LocalDateTime now = LocalDateTime.now();
         character.setCreatedAt(now);
         character.setUpdatedAt(now);
+        
+        // 初始化向量版本号
+        if (character.getVectorVersion() == null) {
+            character.setVectorVersion(1L);
+        }
+        
         characterService.save(character);
+        
         // 保存关系
         if (character.getRelationships() != null) {
             for (CharacterRelationship rel : character.getRelationships()) {
@@ -95,6 +105,11 @@ public class CharacterController {
                 characterRelationshipService.save(rel);
             }
         }
+        
+        // 触发向量同步（异步）
+        entitySyncHelper.triggerCreate("character", character.getId(), 
+            character.getProjectId(), false);
+        
         return Result.success("Character created successfully", character);
     }
 
@@ -108,7 +123,18 @@ public class CharacterController {
         character.setId(id);
         character.setCreatedAt(existingCharacter.getCreatedAt());
         character.setUpdatedAt(LocalDateTime.now());
+        
+        // 递增向量版本号
+        Long currentVersion = existingCharacter.getVectorVersion();
+        character.setVectorVersion(currentVersion != null ? currentVersion + 1 : 1L);
+        
+        // 检查内容是否发生变更
+        String oldContent = buildCharacterContent(existingCharacter);
+        String newContent = buildCharacterContent(character);
+        boolean contentChanged = entitySyncHelper.isContentChanged(oldContent, newContent);
+        
         characterService.updateById(character);
+        
         // 删除原有关系
         LambdaQueryWrapper<CharacterRelationship> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(CharacterRelationship::getSourceCharacterId, id);
@@ -125,6 +151,12 @@ public class CharacterController {
                 characterRelationshipService.save(rel);
             }
         }
+        
+        // 只在内容真正变更时才触发向量同步
+        if (contentChanged) {
+            entitySyncHelper.triggerUpdate("character", character.getId(), 
+                character.getVectorVersion(), character.getProjectId(), false);
+        }
 
         return Result.success("Character updated successfully", character);
     }
@@ -137,6 +169,10 @@ public class CharacterController {
         }
         
         characterService.removeById(id);
+        
+        // 触发向量同步删除（紧急处理）
+        entitySyncHelper.triggerDelete("character", id, character.getProjectId(), true);
+        
         return Result.success("Character deleted successfully", null);
     }
     
@@ -165,5 +201,43 @@ public class CharacterController {
         } catch (Exception e) {
             return Result.error("新角色生成失败: " + e.getMessage());
         }
+    }
+    
+    /**
+     * 构建角色内容用于向量化比较
+     */
+    private String buildCharacterContent(Character character) {
+        if (character == null) return "";
+        
+        StringBuilder content = new StringBuilder();
+        if (character.getName() != null) {
+            content.append("姓名: ").append(character.getName()).append("\n");
+        }
+        if (character.getDescription() != null) {
+            content.append("描述: ").append(character.getDescription()).append("\n");
+        }
+        if (character.getRole() != null) {
+            content.append("角色: ").append(character.getRole()).append("\n");
+        }
+        if (character.getGender() != null) {
+            content.append("性别: ").append(character.getGender()).append("\n");
+        }
+        if (character.getAge() != null) {
+            content.append("年龄: ").append(character.getAge()).append("\n");
+        }
+        if (character.getPersonality() != null && !character.getPersonality().isEmpty()) {
+            content.append("性格特征: ").append(String.join(", ", character.getPersonality())).append("\n");
+        }
+        if (character.getGoals() != null && !character.getGoals().isEmpty()) {
+            content.append("角色目标: ").append(String.join(", ", character.getGoals())).append("\n");
+        }
+        if (character.getBackground() != null) {
+            content.append("角色背景: ").append(character.getBackground()).append("\n");
+        }
+        if (character.getNotes() != null) {
+            content.append("补充信息: ").append(character.getNotes()).append("\n");
+        }
+        
+        return content.toString();
     }
 } 

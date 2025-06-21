@@ -9,6 +9,7 @@ import com.soukon.novelEditorAi.mapper.CharacterMapper;
 import com.soukon.novelEditorAi.mapper.ProjectMapper;
 import com.soukon.novelEditorAi.mapper.WorldMapper;
 import com.soukon.novelEditorAi.service.RagService;
+import com.soukon.novelEditorAi.service.ConsistentVectorSearchService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
@@ -62,6 +63,9 @@ public class RagServiceImpl implements RagService {
 
     @Autowired
     private VectorStore vectorStore;
+    
+    @Autowired
+    private ConsistentVectorSearchService consistentVectorSearchService;
 
     @Autowired
     public RagServiceImpl(ProjectMapper projectMapper,
@@ -407,8 +411,8 @@ public class RagServiceImpl implements RagService {
                     .filterExpression("projectId == " + projectId)
                     .build();
 
-            // 执行相似度搜索
-            List<Document> results = vectorStore.similaritySearch(request);
+            // 使用一致性搜索服务执行相似度搜索
+            List<Document> results = consistentVectorSearchService.searchWithConsistency(request, projectId);
 
             log.info("查询 '{}' 返回了 {} 个相关文档", query, results.size());
             return results;
