@@ -158,6 +158,9 @@ public class WritingAgent extends ReActAgent {
                         
             你上次完成的内容是:
             {previousContent}
+            
+            已调用工具获取的信息：
+            {toolsCallResult}
                         
             你上次思考的结果是:
             {currentThink}
@@ -173,13 +176,13 @@ public class WritingAgent extends ReActAgent {
                     * 引入新意象的时候不能过于突兀，要让读者自然接受
                     * 如何引入新意象和概念，需要注意上下文的衔接，以及意象的自然过度
                         
-                *   生成5个以上与此步骤相关的问题。除了考虑以下常规方面，请至少提出1-2个**挑战当前设定或探索潜在冲突/机遇**的问题，并从**读者体验**及**去AI味**的角度进行思考：
-                    *   优先思考，写作的过程中获得的信息是否足够？应当调用哪些工具获取更多信息？然后自行调用工具并且回答通过工具获取到的信息。
-                    *   基于当前已写内容和剩余目标，**下一步的合理字数区间是多少？应如何分配给不同的描写重点？**
-                    *   为了最佳地展现当前情节阶段（例如：悬念升级、情感积蓄、冲突爆发前夜），**应采用何种叙事节奏（如急促、舒缓、张弛交替）和整体的情感基调？
-                    *    **当前最需要重点描写的核心内容是什么？**（例如：某个关键互动、一个重要发现、角色内心的激烈斗争、特定环境氛围的极致渲染）。
-                    *   如何设计**最自然且富有逻辑的衔接点**，将 `上次完成的内容` 的结尾与下一步的开端无缝连接，并清晰指示出情节的流向？
-                    *   如何为下一步或更长远的情节做有效铺垫？
+                *   生成6个以上与此步骤相关的问题。除了考虑以下常规方面，请至少提出1-2个**挑战当前设定或探索潜在冲突/机遇**的问题，并从**读者体验**及**去AI味**的角度进行思考：
+                    1.   写作的过程中获得的信息是否足够？应当调用哪些工具获取更多信息？自行调用工具后获得的信息是什么。
+                    2.   基于当前已写内容和剩余目标，**下一步的合理字数区间是多少？应如何分配给不同的描写重点？**
+                    3.   为了最佳地展现当前情节阶段（例如：悬念升级、情感积蓄、冲突爆发前夜），**应采用何种叙事节奏（如急促、舒缓、张弛交替）和整体的情感基调？
+                    4.    **当前最需要重点描写的核心内容是什么？**（例如：某个关键互动、一个重要发现、角色内心的激烈斗争、特定环境氛围的极致渲染）。
+                    5.   如何设计**最自然且富有逻辑的衔接点**，将 `上次完成的内容` 的结尾与下一步的开端无缝连接，并清晰指示出情节的流向？
+                    6.   如何为下一步或更长远的情节做有效铺垫？
                     *   **探索性与挑战性问题（至少1-2个）：**
                         *   **当前角色的行为逻辑或动机是否存在某种被忽略的内在矛盾或更深层次的驱动力？** 如何通过细节展现出来？
                         *   **这个场景除了按部就班地发展，是否存在某种“意料之外但情理之中”的变数或转折，能让故事更有张力或揭示更深的主题？**
@@ -450,6 +453,8 @@ public class WritingAgent extends ReActAgent {
             this.stepData.put("chapterId", chapterContentRequest.getChapterId());
             this.stepData.put("projectId", chapterContentRequest.getChapterContext().getProjectId());
             this.stepData.put("planId", planContext.getPlanId());
+            this.stepData.put("toolsCallResult", this.chapterContentRequest.getToolsCallResult());
+
             Message thinkMessage = promptTemplate.createMessage(this.stepData);
             List<Message> messageList = new ArrayList<>();
             addThinkPrompt(messageList);

@@ -43,6 +43,9 @@ public class PlotServiceImpl extends ServiceImpl<PlotMapper, Plot> implements Pl
     @Autowired
     private ItemService itemService;
 
+    @Autowired
+    private com.soukon.novelEditorAi.service.EntitySyncHelper entitySyncHelper;
+
     private final PlotMapper plotMapper;
     private final ChatClient chatClient;
     
@@ -210,6 +213,10 @@ public class PlotServiceImpl extends ServiceImpl<PlotMapper, Plot> implements Pl
             plot.setCreatedAt(now);
             plot.setUpdatedAt(now);
             plot.setStatus("draft");
+            // 初始化向量版本号
+            if (plot.getVectorVersion() == null) {
+                plot.setVectorVersion(1L);
+            }
             // 根据章节的目标字数平均分配情节字数目标
             if (chapter.getWordCountGoal() != null) {
                 int totalPlots = existingPlots.size() + newPlots.size();
@@ -218,6 +225,11 @@ public class PlotServiceImpl extends ServiceImpl<PlotMapper, Plot> implements Pl
             }
             // 保存到数据库
             this.save(plot);
+            
+            // 触发向量同步（异步）
+            entitySyncHelper.triggerCreate("plot", plot.getId(), 
+                plot.getProjectId(), false);
+            log.debug("新情节已创建并触发向量同步: {}", plot.getId());
         }
 
         // 合并已有的和新生成的情节，并按sortOrder排序

@@ -126,10 +126,28 @@ public class PlotController {
             plot.setCreatedAt(existingPlot.getCreatedAt());
             plot.setUpdatedAt(LocalDateTime.now());
             
+            // 递增向量版本号
+            Long currentVersion = existingPlot.getVectorVersion();
+            plot.setVectorVersion(currentVersion != null ? currentVersion + 1 : 1L);
+            
             // 验证并处理sortOrder的唯一性
             plotService.validateAndHandleSortOrder(plot, true);
             
+            // 检查内容是否发生变更
+            String oldContent = buildPlotContent(existingPlot);
+            String newContent = buildPlotContent(plot);
+            boolean contentChanged = entitySyncHelper.isContentChanged(oldContent, newContent);
+            
             plotService.updateById(plot);
+            
+            // 只在内容真正变更时才触发向量同步
+            if (contentChanged) {
+                entitySyncHelper.triggerUpdate("plot", plot.getId(), 
+                    plot.getVectorVersion(), plot.getProjectId(), false);
+                log.info("情节内容已变更，触发向量同步: {}", plot.getId());
+            } else {
+                log.debug("情节内容未变更，跳过向量同步: {}", plot.getId());
+            }
             
             return Result.success("Plot updated successfully", plot);
         } catch (IllegalArgumentException e) {
@@ -149,6 +167,11 @@ public class PlotController {
         }
         
         plotService.removeById(id);
+        
+        // 触发向量同步删除（紧急处理）
+        entitySyncHelper.triggerDelete("plot", id, plot.getProjectId(), true);
+        log.info("情节已删除，触发向量同步删除: {}", id);
+        
         return Result.success("Plot deleted successfully", null);
     }
     
@@ -164,7 +187,18 @@ public class PlotController {
             return Result.error("IDs list cannot be empty");
         }
         
+        // 获取要删除的情节信息（用于向量同步）
+        List<Plot> plotsToDelete = plotService.listByIds(ids);
+        
         plotService.removeByIds(ids);
+        
+        // 批量触发向量同步删除
+        for (Plot plot : plotsToDelete) {
+            entitySyncHelper.triggerDelete("plot", plot.getId(), 
+                plot.getProjectId(), false); // 批量删除使用异步
+        }
+        log.info("批量删除情节完成，触发了{}个向量同步删除任务", plotsToDelete.size());
+        
         return Result.success("批量删除成功", null);
     }
     
@@ -272,5 +306,40 @@ public class PlotController {
             log.error("重新整理情节排序时发生错误: {}", e.getMessage(), e);
             return Result.error("重新整理情节排序失败: " + e.getMessage());
         }
+    }
+
+    /**
+     * 构建情节内容用于向量化比较
+     */
+    private String buildPlotContent(Plot plot) {
+        if (plot == null) return "";
+        
+        StringBuilder content = new StringBuilder();
+        if (plot.getTitle() != null) {
+            content.append("标题: ").append(plot.getTitle()).append("\n");
+        }
+        if (plot.getDescription() != null) {
+            content.append("描述: ").append(plot.getDescription()).append("\n");
+        }
+        if (plot.getType() != null) {
+            content.append("类型: ").append(plot.getType()).append("\n");
+        }
+        if (plot.getStatus() != null) {
+            content.append("状态: ").append(plot.getStatus()).append("\n");
+        }
+        if (plot.getCompletionPercentage() != null) {
+            content.append("完成百分比: ").append(plot.getCompletionPercentage()).append("\n");
+        }
+        if (plot.getWordCountGoal() != null) {
+            content.append("目标字数: ").append(plot.getWordCountGoal()).append("\n");
+        }
+        if (plot.getCharacterIds() != null && !plot.getCharacterIds().isEmpty()) {
+            content.append("关联角色ID: ").append(plot.getCharacterIds()).append("\n");
+        }
+        if (plot.getItemIds() != null && !plot.getItemIds().isEmpty()) {
+            content.append("关联条目ID: ").append(plot.getItemIds()).append("\n");
+        }
+        
+        return content.toString();
     }
 }

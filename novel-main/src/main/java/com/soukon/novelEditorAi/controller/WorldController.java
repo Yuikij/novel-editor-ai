@@ -18,6 +18,9 @@ public class WorldController {
     @Autowired
     private WorldService worldService;
 
+    @Autowired
+    private com.soukon.novelEditorAi.service.EntitySyncHelper entitySyncHelper;
+
     @GetMapping
     public Result<List<World>> list() {
         List<World> worlds = worldService.list();
@@ -57,7 +60,17 @@ public class WorldController {
         LocalDateTime now = LocalDateTime.now();
         world.setCreatedAt(now);
         world.setUpdatedAt(now);
+        
+        // 初始化向量版本号
+        if (world.getVectorVersion() == null) {
+            world.setVectorVersion(1L);
+        }
+        
         worldService.save(world);
+        
+        // 触发向量同步（异步）
+        entitySyncHelper.triggerCreate("world", world.getId(), null, false);
+        
         return Result.success("World created successfully", world);
     }
 
@@ -71,7 +84,23 @@ public class WorldController {
         world.setId(id);
         world.setCreatedAt(existingWorld.getCreatedAt());
         world.setUpdatedAt(LocalDateTime.now());
+        
+        // 递增向量版本号
+        Long currentVersion = existingWorld.getVectorVersion();
+        world.setVectorVersion(currentVersion != null ? currentVersion + 1 : 1L);
+        
+        // 检查内容是否发生变更
+        String oldContent = buildWorldContent(existingWorld);
+        String newContent = buildWorldContent(world);
+        boolean contentChanged = entitySyncHelper.isContentChanged(oldContent, newContent);
+        
         worldService.updateById(world);
+        
+        // 只在内容真正变更时才触发向量同步
+        if (contentChanged) {
+            entitySyncHelper.triggerUpdate("world", world.getId(), 
+                world.getVectorVersion(), null, false);
+        }
         
         return Result.success("World updated successfully", world);
     }
@@ -84,6 +113,33 @@ public class WorldController {
         }
         
         worldService.removeById(id);
+        
+        // 触发向量同步删除（紧急处理）
+        entitySyncHelper.triggerDelete("world", id, null, true);
+        
         return Result.success("World deleted successfully", null);
+    }
+    
+    /**
+     * 构建世界观内容用于向量化比较
+     */
+    private String buildWorldContent(World world) {
+        if (world == null) return "";
+        
+        StringBuilder content = new StringBuilder();
+        if (world.getName() != null) {
+            content.append("名称: ").append(world.getName()).append("\n");
+        }
+        if (world.getDescription() != null) {
+            content.append("描述: ").append(world.getDescription()).append("\n");
+        }
+        if (world.getElements() != null && !world.getElements().isEmpty()) {
+            content.append("元素: ").append(world.getElements()).append("\n");
+        }
+        if (world.getNotes() != null) {
+            content.append("备注: ").append(world.getNotes()).append("\n");
+        }
+        
+        return content.toString();
     }
 } 

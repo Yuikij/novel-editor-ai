@@ -52,7 +52,7 @@ public class ProjectChatController {
      */
     @GetMapping("/context")
     public Result<ProjectChatContext> getChatContext(@PathVariable("projectId") Long projectId,
-                                                     @RequestParam(required = false) String sessionId) {
+                                                     @RequestParam(name = "sessionId",required = false) String sessionId) {
         try {
             ProjectChatContext context = projectChatService.getChatContext(projectId, sessionId);
             return Result.success("获取对话上下文成功", context);
@@ -70,7 +70,7 @@ public class ProjectChatController {
      */
     @DeleteMapping("/context")
     public Result<Void> clearChatContext(@PathVariable("projectId") Long projectId,
-                                         @RequestParam(required = false) String sessionId) {
+                                         @RequestParam(name = "sessionId", required = false) String sessionId) {
         try {
             projectChatService.clearChatContext(projectId, sessionId);
             return Result.success("清除对话上下文成功", null);
