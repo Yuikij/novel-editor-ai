@@ -539,7 +539,7 @@ public class ChapterContentServiceImpl implements ChapterContentService {
 
         // 已有内容
         Long chapterId = context.getCurrentChapter().getId();
-        String latestChapterContent = chapterService.getLatestChapterContent(chapterId, 2000);
+        String latestChapterContent = chapterService.getLatestChapterContent(chapterId, 1000);
         if (latestChapterContent != null && !latestChapterContent.isEmpty()) {
             userPromptBuilder.append("### 已有内容\n");
             userPromptBuilder.append(latestChapterContent).append("\n\n");

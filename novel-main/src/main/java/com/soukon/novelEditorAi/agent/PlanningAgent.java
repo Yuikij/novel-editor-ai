@@ -68,7 +68,7 @@
 //         private List<ToolCallPlan> toolsToCall;
 //         @JsonPropertyDescription("当前分析的思考过程")
 //         private String reasoning;
-         @JsonPropertyDescription("调用工具返回的结果整合")
+         @JsonPropertyDescription("调用工具返回的结果集合")
          private List<ToolCallResult> callResult;
 
          public static String fromToolCallResult(List<ToolCallResult> callResult) {
@@ -76,7 +76,7 @@
                  return "";
              }
              StringBuilder sb = new StringBuilder();
-             sb.append("调用工具返回的结果整合：\n");
+             sb.append("调用工具返回的结果集合：\n");
              callResult.forEach(result -> {
                  sb.append("  工具: ").append(result.getToolName())
                          .append(", 结果: ").append(result.getResult()).append("\n");
@@ -111,7 +111,7 @@
      public static class ToolCallResult {
          @JsonPropertyDescription("工具名称")
          private String toolName;
-         @JsonPropertyDescription("调用此工具的结果")
+         @JsonPropertyDescription("字符串类型，工具的返回结果")
          private String result;
      }
 
@@ -143,7 +143,7 @@
              **可用工具：**
              - latest_content_get: 获取最新的章节内容，了解当前写作进度和上下文
              - get_character_info: 获取特定角色的详细信息，包括性格、背景、关系等
-             - rag_query: 检索相关的背景信息、设定资料等
+             - rag_query: 检索任何相关的信息
 
              **分析原则：**
              1. **优先获取上下文：** 首先确保了解当前章节的写作状态和前文内容
@@ -175,7 +175,7 @@
              **可用工具：**
              - latest_content_get: 获取最新章节内容
              - get_character_info: 获取角色详细信息
-             - rag_query: 检索相关背景信息
+             - rag_query: 检索任何相关的信息
                           
              ## 上下文信息：
              {contextInfo}
@@ -196,7 +196,7 @@
 
              严格输出结构化json格式，不需要额外的任何解释说明！
 
-             输出格式：{format}
+             输出格式为：{format}
              """;
 
      // 工具调用阶段的系统提示词
@@ -211,7 +211,7 @@
              **可用工具：**
              - latest_content_get: 获取最新章节内容
              - get_character_info: 获取角色详细信息
-             - rag_query: 检索相关背景信息
+             - rag_query: 检索任何相关的信息
              """;
 
      // 行动阶段的提示词模板
@@ -540,7 +540,7 @@
          // 如果需要更多背景信息，调用RAG工具
          if (currentToolCallRound >= 1 && !hasRagInfo()) {
              prompt.append("**第三优先级：检索相关信息**\n");
-             prompt.append("调用 rag_query 工具检索相关背景信息\n");
+             prompt.append("调用 rag_query 检索任何相关的信息\n");
              prompt.append("参数: chapterId=\"").append(chapterContentRequest.getChapterId()).append("\"");
              prompt.append(", query=\"背景信息\"");
              prompt.append(", planId=\"").append(planId).append("\"\n\n");
